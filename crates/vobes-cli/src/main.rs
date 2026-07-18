@@ -1,10 +1,13 @@
 //! vbs — Vobes CLI.
 //!
 //! Natural extension of the desktop app. Same core, two faces.
-//! Command implementations arrive in Phase 7.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, clippy::all)]
+
+mod app;
+mod commands;
+mod output;
 
 use clap::{Parser, Subcommand};
 
@@ -83,9 +86,33 @@ fn main() -> std::process::ExitCode {
             println!("Run `vbs --help` to see commands.");
             std::process::ExitCode::SUCCESS
         }
-        Some(cmd) => {
-            eprintln!("not implemented yet: {cmd:?}");
-            std::process::ExitCode::FAILURE
-        }
+        Some(cmd) => match app::App::load() {
+            Ok(app) => match dispatch(&app, cmd) {
+                Ok(()) => std::process::ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    std::process::ExitCode::FAILURE
+                }
+            },
+            Err(e) => {
+                eprintln!("error: {e}");
+                std::process::ExitCode::FAILURE
+            }
+        },
+    }
+}
+
+fn dispatch(app: &app::App, cmd: Command) -> vobes_core::Result<()> {
+    match cmd {
+        Command::Scan => commands::scan::run(app),
+        Command::List => commands::list::run(app),
+        Command::Show { name } => commands::show::run(app, &name),
+        Command::Log { limit } => commands::log::run(app, limit),
+        Command::Sync => commands::sync::run(app),
+        Command::Add { path } => commands::add::run(app, &path),
+        Command::Rm { name } => commands::rm::run(app, &name),
+        Command::Open { name } => commands::open::run(app, &name),
+        Command::Export { out } => commands::export::run(app, out.as_deref()),
+        Command::Init => commands::init::run(app),
     }
 }
