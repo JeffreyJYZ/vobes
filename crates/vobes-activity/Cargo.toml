@@ -1,0 +1,13 @@
+[package]
+name = "vobes-activity"
+description = "Vobes activity tracking — event recording and timeline queries."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+vobes-core = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

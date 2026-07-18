@@ -1,0 +1,77 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/vobes-core",
+    "crates/vobes-scan",
+    "crates/vobes-git",
+    "crates/vobes-activity",
+    "crates/vobes-store",
+    "crates/vobes-config",
+    "crates/vobes-cli",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+authors = ["Yizhou Jiang"]
+license = "MIT"
+repository = "https://github.com/jeffreyjyz/vobes"
+homepage = "https://jyz.land/vobes"
+description = "Developer command center — unify projects, git, and activity."
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Errors
+thiserror = "1"
+miette = "1"
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+console = "0.15"
+comfy-table = "7"
+indicatif = "0.17"
+
+# Filesystem & paths
+walkdir = "2"
+dirs = "5"
+glob = "0.3"
+
+# Concurrency
+rayon = "1.10"
+crossbeam-channel = "0.5"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Git
+git2 = "0.19"
+
+# Storage
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Regex
+regex = "1"
+once_cell = "1"
+
+# Internal crates
+vobes-core = { path = "crates/vobes-core" }
+vobes-scan = { path = "crates/vobes-scan" }
+vobes-git = { path = "crates/vobes-git" }
+vobes-activity = { path = "crates/vobes-activity" }
+vobes-store = { path = "crates/vobes-store" }
+vobes-config = { path = "crates/vobes-config" }
+vobes-cli = { path = "crates/vobes-cli" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

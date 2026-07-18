@@ -1,0 +1,31 @@
+[package]
+name = "vobes-cli"
+description = "Vobes CLI — the vbs command."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "vbs"
+path = "src/main.rs"
+
+[dependencies]
+vobes-core = { workspace = true }
+vobes-config = { workspace = true }
+vobes-scan = { workspace = true }
+vobes-git = { workspace = true }
+vobes-activity = { workspace = true }
+vobes-store = { workspace = true }
+clap = { workspace = true }
+console = { workspace = true }
+comfy-table = { workspace = true }
+indicatif = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dirs = { workspace = true }
+chrono = { workspace = true }

@@ -1,0 +1,21 @@
+[general]
+name = "Personal Workspace"
+
+[scan]
+roots = ["~/dev", "~/work"]
+exclude = ["scratch", "experiments", "tmp"]
+max_depth = 4
+follow_symlinks = false
+
+[display]
+theme = "auto"
+date_format = "relative"
+default_sort = "last_modified"
+
+[git]
+cache_ttl_seconds = 60
+fetch_upstream = false
+
+[export]
+path = "~/.vobes/snapshots"
+format = "json"

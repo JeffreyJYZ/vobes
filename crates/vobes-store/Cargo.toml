@@ -1,0 +1,18 @@
+[package]
+name = "vobes-store"
+description = "Vobes storage — SQLite primary, JSON export."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+vobes-core = { workspace = true }
+vobes-config = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }

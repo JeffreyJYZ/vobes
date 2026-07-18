@@ -1,0 +1,30 @@
+# target
+target/
+
+# Cargo lock — keep for binary, ignore for lib-only
+# Comment next line once we ship the CLI binary
+# Cargo.lock
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.iml
+
+# Local vobes data
+.vobes/
+*.db
+*.db-journal
+
+# Node (future Tauri frontend)
+node_modules/
+dist/
+.vite/
+
+# Secret configs
+**/secrets.toml
+.env
+.env.*
