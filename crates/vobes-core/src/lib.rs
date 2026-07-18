@@ -12,9 +12,9 @@ pub mod git;
 pub mod vobe;
 
 pub use activity::{ActivityEvent, ActivityKind};
-pub use error::{Error, Result, VobeId};
+pub use error::{Error, ParseIdError, Result, VobeId};
 pub use git::{Commit, GitInfo};
-pub use vobe::Vobe;
+pub use vobe::{Vobe, ARCHIVED_TAG};
 
 /// Re-export chrono DateTime for downstream convenience.
 pub use chrono::{DateTime, Utc};

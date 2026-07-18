@@ -1,6 +1,7 @@
 //! Shared error types and aliases.
 
 use std::fmt;
+use std::str::FromStr;
 
 /// Stable identifier for a vobe.
 ///
@@ -10,7 +11,7 @@ use std::fmt;
 pub struct VobeId(pub String);
 
 impl VobeId {
-    /// Generate a fresh random id.
+    /// Generate a fresh id from the current monotonic-ish timestamp.
     pub fn new() -> Self {
         use std::time::{SystemTime, UNIX_EPOCH};
         let nanos = SystemTime::now()
@@ -18,6 +19,16 @@ impl VobeId {
             .map(|d| d.as_nanos())
             .unwrap_or(0);
         Self(format!("vobe_{nanos:x}"))
+    }
+
+    /// Wrap an existing id string.
+    pub fn from_string(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+
+    /// Borrow the inner string.
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -37,6 +48,24 @@ impl AsRef<str> for VobeId {
     fn as_ref(&self) -> &str {
         &self.0
     }
+}
+
+impl FromStr for VobeId {
+    type Err = ParseIdError;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        if s.is_empty() {
+            return Err(ParseIdError::Empty);
+        }
+        Ok(Self(s.to_string()))
+    }
+}
+
+/// Errors from parsing a [`VobeId`] from a string.
+#[derive(thiserror::Error, Debug)]
+pub enum ParseIdError {
+    /// Input was empty.
+    #[error("vobe id cannot be empty")]
+    Empty,
 }
 
 /// Unified error type for the Vobes ecosystem.
@@ -70,9 +99,45 @@ pub enum Error {
     #[error("vobe not found: {0}")]
     NotFound(String),
 
+    /// Invalid id.
+    #[error("invalid id: {0}")]
+    InvalidId(#[from] ParseIdError),
+
     /// Generic internal error.
     #[error("internal error: {0}")]
     Internal(String),
+}
+
+impl Error {
+    /// Build a storage error from any string-like source.
+    pub fn storage(msg: impl Into<String>) -> Self {
+        Self::Storage(msg.into())
+    }
+
+    /// Build a git error from any string-like source.
+    pub fn git(msg: impl Into<String>) -> Self {
+        Self::Git(msg.into())
+    }
+
+    /// Build a config error from any string-like source.
+    pub fn config(msg: impl Into<String>) -> Self {
+        Self::Config(msg.into())
+    }
+
+    /// Build a scan error from any string-like source.
+    pub fn scan(msg: impl Into<String>) -> Self {
+        Self::Scan(msg.into())
+    }
+
+    /// Build a not-found error from any string-like source.
+    pub fn not_found(msg: impl Into<String>) -> Self {
+        Self::NotFound(msg.into())
+    }
+
+    /// Build an internal error from any string-like source.
+    pub fn internal(msg: impl Into<String>) -> Self {
+        Self::Internal(msg.into())
+    }
 }
 
 /// Alias for fallible operations across the vobes stack.
