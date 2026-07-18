@@ -8,6 +8,17 @@ members = [
     "crates/vobes-store",
     "crates/vobes-config",
     "crates/vobes-cli",
+    "desktop/src-tauri",
+]
+# Skip desktop by default so core CLI stays fast to build/test.
+default-members = [
+    "crates/vobes-core",
+    "crates/vobes-scan",
+    "crates/vobes-git",
+    "crates/vobes-activity",
+    "crates/vobes-store",
+    "crates/vobes-config",
+    "crates/vobes-cli",
 ]
 
 [workspace.package]
@@ -60,6 +71,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Regex
 regex = "1"
 once_cell = "1"
+
+# Desktop (Tauri)
+tauri = { version = "2.1", features = [] }
+tauri-build = { version = "2.0", features = [] }
+tauri-plugin-shell = "2.0"
 
 # Internal crates
 vobes-core = { path = "crates/vobes-core" }

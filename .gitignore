@@ -19,10 +19,12 @@ Thumbs.db
 *.db
 *.db-journal
 
-# Node (future Tauri frontend)
+# Node (Tauri frontend)
 node_modules/
 dist/
 .vite/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
 
 # Secret configs
 **/secrets.toml

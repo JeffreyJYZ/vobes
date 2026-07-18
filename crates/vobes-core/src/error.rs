@@ -142,3 +142,9 @@ impl Error {
 
 /// Alias for fallible operations across the vobes stack.
 pub type Result<T> = std::result::Result<T, Error>;
+
+impl serde::Serialize for Error {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        s.serialize_str(&self.to_string())
+    }
+}
