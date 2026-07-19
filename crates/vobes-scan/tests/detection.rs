@@ -22,7 +22,21 @@ fn user_excludes_extend_builtin() {
 #[test]
 fn normal_dirs_are_not_excluded() {
     assert!(!is_excluded("my-app", &[]));
-    assert!(!is_excluded("src", &["scratch".to_string()]));
+    // Source-only subdirs are not junk excludes (so language census still
+    // sees their files); they are only excluded as vobe candidates.
+    assert!(!is_excluded("src", &[]));
+    assert!(!is_excluded("src-tauri", &[]));
+}
+
+#[test]
+fn code_subdirs_excluded_as_candidates() {
+    use vobes_scan::is_code_subdir;
+    assert!(is_code_subdir("src"));
+    assert!(is_code_subdir("src-tauri"));
+    assert!(is_code_subdir("lib"));
+    assert!(is_code_subdir("app"));
+    assert!(!is_code_subdir("components"));
+    assert!(!is_code_subdir("node_modules"));
 }
 
 #[test]

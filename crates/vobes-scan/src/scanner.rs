@@ -9,7 +9,7 @@ use vobes_core::Result;
 use walkdir::WalkDir;
 
 use crate::detector::{Detection, Detector, Scanner};
-use crate::exclude::is_excluded;
+use crate::exclude::{is_code_subdir, is_excluded};
 use crate::{FrameworkDetector, LanguageDetector, PackageManagerDetector, RepoDetector};
 
 /// Output of scanning a single root.
@@ -131,6 +131,17 @@ impl DefaultScanner {
                 continue;
             }
             dirs_walked += 1;
+            // Source-only subdirs (src, src-tauri, lib, app) are not
+            // themselves projects, but we still descend so the parent
+            // project's detectors can see their files.
+            let is_code = entry
+                .file_name()
+                .to_str()
+                .map(is_code_subdir)
+                .unwrap_or(false);
+            if is_code {
+                continue;
+            }
             candidates.push(entry.path().to_path_buf());
         }
 

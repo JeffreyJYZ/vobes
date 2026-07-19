@@ -15,5 +15,5 @@ pub use detector::{
     framework::FrameworkDetector, language::LanguageDetector, package::PackageManagerDetector,
     repo::RepoDetector, Detection, Detector, Scanner,
 };
-pub use exclude::{is_excluded, BUILTIN_EXCLUDES};
+pub use exclude::{is_code_subdir, is_excluded, BUILTIN_EXCLUDES};
 pub use scanner::{DefaultScanner, ScanReport};

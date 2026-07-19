@@ -1,9 +1,10 @@
 //! Exclude rules for the scanner.
 
-/// Built-in directories always excluded from scan descent.
+/// Junk/build directories always excluded from every scan descent.
 ///
-/// User config may add more via `scan.exclude`. These cannot be
-/// overridden — they are always excluded to keep scans fast and safe.
+/// These are never projects and contain no useful source we want to
+/// attribute to a parent project. Used both for candidate discovery and
+/// for the language census.
 pub const BUILTIN_EXCLUDES: &[&str] = &[
     "node_modules",
     ".git",
@@ -24,13 +25,25 @@ pub const BUILTIN_EXCLUDES: &[&str] = &[
     "*.egg-info",
 ];
 
+/// Source-only subdirs that live *inside* a real project but are not
+/// projects themselves. Excluded from candidate discovery (so `src`,
+/// `src-tauri`, etc. are not mistaken for standalone vobes) but NOT from
+/// the language census — their files still belong to the parent project.
+pub const CODE_SUBDIR_EXCLUDES: &[&str] = &["src", "src-tauri", "lib", "app"];
+
 /// Whether a directory name should be excluded from descent.
 ///
-/// Matches against the built-in excludes plus user-supplied extras.
+/// Matches against the built-in junk excludes plus user-supplied extras.
 /// `name` is the file name component (not a full path).
 pub fn is_excluded(name: &str, extra: &[String]) -> bool {
     if BUILTIN_EXCLUDES.contains(&name) {
         return true;
     }
     extra.iter().any(|e| e == name)
+}
+
+/// Whether a directory is a source-only subdir that should never be
+/// treated as its own vobe candidate.
+pub fn is_code_subdir(name: &str) -> bool {
+    CODE_SUBDIR_EXCLUDES.contains(&name)
 }

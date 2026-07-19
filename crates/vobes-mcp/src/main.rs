@@ -190,9 +190,7 @@ fn lookup(app: &App, name: &str) -> Result<Option<Vobe>, String> {
         return Ok(Some(v));
     }
     let abs = normalize(&std::path::PathBuf::from(name));
-    app.store
-        .get_vobe_by_path(&abs)
-        .map_err(|e| e.to_string())
+    app.store.get_vobe_by_path(&abs).map_err(|e| e.to_string())
 }
 
 fn tool_list(app: &App) -> Result<String, String> {

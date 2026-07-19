@@ -79,19 +79,33 @@
   function vobeName(id: string): string {
     return vobes.find((v) => v.id === id)?.name ?? id.slice(0, 10);
   }
+
+  function setView(next: "dashboard" | "projects" | "activity") {
+    view = next;
+    selected = null;
+  }
 </script>
 
 <div class="app">
   <aside class="sidebar">
-    <h1>Vobes</h1>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M3 4 L12 20 L21 4"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      <h1>Vobes</h1>
+    </div>
     <button
       type="button"
       class="nav-item"
       class:active={view === "dashboard"}
-      on:click={() => {
-        view = "dashboard";
-        selected = null;
-      }}
+      on:click={() => setView("dashboard")}
     >
       Dashboard
     </button>
@@ -99,10 +113,7 @@
       type="button"
       class="nav-item"
       class:active={view === "projects"}
-      on:click={() => {
-        view = "projects";
-        selected = null;
-      }}
+      on:click={() => setView("projects")}
     >
       Projects
     </button>
@@ -110,10 +121,7 @@
       type="button"
       class="nav-item"
       class:active={view === "activity"}
-      on:click={() => {
-        view = "activity";
-        selected = null;
-      }}
+      on:click={() => setView("activity")}
     >
       Activity
     </button>
@@ -173,7 +181,12 @@
         </div>
       {/if}
     {:else if view === "projects"}
-      <h2>{selected ? selected.name : "Projects"}</h2>
+      <div class="view-head">
+        <h2>{selected ? selected.name : "Projects"}</h2>
+        <button class="primary" on:click={scan} disabled={loading}>
+          {loading ? "Scanning…" : "Rescan"}
+        </button>
+      </div>
       {#if selected}
         <button on:click={() => (selected = null)}>← Back</button>
         <div style="margin-top: 16px;">
@@ -216,7 +229,10 @@
         </div>
       {/if}
     {:else if view === "activity"}
-      <h2>Activity</h2>
+      <div class="view-head">
+        <h2>Activity</h2>
+        <button on:click={refresh} disabled={loading}>Refresh</button>
+      </div>
       <table style="width: 100%; border-collapse: collapse;">
         <thead>
           <tr>
@@ -227,7 +243,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each activity as e (e.id ?? e.timestamp)}
+          {#each activity as e, i (i)}
             <tr style="border-top: 1px solid var(--border);">
               <td style="padding: 6px;">{relative(e.timestamp)}</td>
               <td style="padding: 6px;">{vobeName(e.vobe_id)}</td>
