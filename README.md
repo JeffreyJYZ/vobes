@@ -71,7 +71,7 @@ Tools: `vobes_list`, `vobes_show`, `vobes_search`, `vobes_recent_activity`, `vob
 ### Prerequisites
 
 - Rust stable
-- Node 20+ and pnpm 9+
+- Node 22+ and pnpm 11+
 - macOS: Xcode CLI tools
 - Linux: `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev
   librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev`
