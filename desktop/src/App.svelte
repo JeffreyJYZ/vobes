@@ -84,7 +84,8 @@
 <div class="app">
   <aside class="sidebar">
     <h1>Vobes</h1>
-    <div
+    <button
+      type="button"
       class="nav-item"
       class:active={view === "dashboard"}
       on:click={() => {
@@ -93,8 +94,9 @@
       }}
     >
       Dashboard
-    </div>
-    <div
+    </button>
+    <button
+      type="button"
       class="nav-item"
       class:active={view === "projects"}
       on:click={() => {
@@ -103,8 +105,9 @@
       }}
     >
       Projects
-    </div>
-    <div
+    </button>
+    <button
+      type="button"
       class="nav-item"
       class:active={view === "activity"}
       on:click={() => {
@@ -113,7 +116,7 @@
       }}
     >
       Activity
-    </div>
+    </button>
   </aside>
 
   <main class="main">
@@ -136,7 +139,8 @@
       {:else}
         <div class="vobe-grid">
           {#each vobes as v (v.id)}
-            <div
+            <button
+              type="button"
               class="vobe-card"
               on:click={() => {
                 selected = v;
@@ -164,7 +168,7 @@
                 {/if}
                 <span class="badge">{relative(v.last_modified)}</span>
               </div>
-            </div>
+            </button>
           {/each}
         </div>
       {/if}
@@ -200,14 +204,14 @@
       {:else}
         <div class="vobe-grid">
           {#each vobes as v (v.id)}
-            <div class="vobe-card" on:click={() => (selected = v)}>
+            <button type="button" class="vobe-card" on:click={() => (selected = v)}>
               <div class="name">{v.name}</div>
               <div class="meta">
                 <span>{v.language ?? "-"}</span>
                 <span>·</span>
                 <span>{v.package_manager ?? "-"}</span>
               </div>
-            </div>
+            </button>
           {/each}
         </div>
       {/if}

@@ -80,10 +80,15 @@ button.primary:hover {
 }
 
 .nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
   padding: 6px 10px;
+  border: none;
   border-radius: 6px;
   cursor: pointer;
   color: var(--fg-muted);
+  background: transparent;
 }
 .nav-item:hover {
   background: var(--bg);
@@ -112,6 +117,8 @@ button.primary:hover {
 }
 
 .vobe-card {
+  display: block;
+  text-align: left;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 14px;
