@@ -33,6 +33,7 @@
   let loading = false;
   let error: string | null = null;
   let selected: Vobe | null = null;
+  let confirmReset = false;
 
   onMount(async () => {
     await refresh();
@@ -66,20 +67,13 @@
   }
 
   async function resetAndRescan() {
-    if (
-      !window.confirm(
-        "Reset & Rescan will DELETE every vobe and all activity. This cannot be undone. Continue?",
-      )
-    ) {
-      return;
-    }
     loading = true;
     error = null;
     try {
       const found = await invoke<number>("reset_and_rescan");
       await refresh();
-      error = null;
-      alert(`Reset complete — ${found} vobes re-discovered.`);
+      confirmReset = false;
+      error = `Reset complete — ${found} vobes re-discovered.`;
     } catch (e) {
       error = String(e);
     } finally {
@@ -211,7 +205,7 @@
           </button>
           <button
             class="danger"
-            on:click={resetAndRescan}
+            on:click={() => (confirmReset = true)}
             disabled={loading}
           >
             Reset &amp; Rescan
@@ -286,4 +280,37 @@
       </table>
     {/if}
   </main>
+
+  {#if confirmReset}
+    <button
+      class="modal-backdrop"
+      type="button"
+      aria-label="Close dialog"
+      on:click={(e) => {
+        if (e.target === e.currentTarget) confirmReset = false;
+      }}
+    >
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Reset and rescan confirmation"
+        tabindex="-1"
+      >
+        <h3>Reset &amp; Rescan?</h3>
+        <p>
+          This will <strong>delete every vobe and all activity</strong>. There
+          is no undo. The app will then re-scan all roots from scratch.
+        </p>
+        <div class="modal-actions">
+          <button on:click={() => (confirmReset = false)} disabled={loading}>
+            Cancel
+          </button>
+          <button class="danger" on:click={resetAndRescan} disabled={loading}>
+            {loading ? "Working…" : "Delete everything & rescan"}
+          </button>
+        </div>
+      </div>
+    </button>
+  {/if}
 </div>
