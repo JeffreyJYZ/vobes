@@ -11,8 +11,8 @@ use crate::exclude::is_excluded;
 
 /// Map of file extension → language name, for the most common cases.
 ///
-/// Order matters only for tie-breaking. Multiple extensions (`ts`, `tsx`)
-/// map to TypeScript so React/Next projects show TS even with JSX files.
+/// Multiple extensions (`ts`, `tsx`) map to TypeScript so React/Next
+/// projects report TypeScript even when JSX files are present.
 fn language_for_ext(ext: &str) -> Option<&'static str> {
     Some(match ext {
         "rs" => "Rust",
@@ -60,6 +60,24 @@ fn language_for_ext(ext: &str) -> Option<&'static str> {
         "tex" => "LaTeX",
         _ => return None,
     })
+}
+
+/// Relative importance of a language when picking a project's primary
+/// language. Programming/source languages outrank styling and markup so a
+/// Next.js app full of `.css` files still reports TypeScript, not CSS.
+///
+/// Higher = more likely to be the project's primary language.
+fn lang_weight(lang: &str) -> u8 {
+    match lang {
+        // Styling / markup — lowest priority.
+        "CSS" | "SCSS" | "Less" | "HTML" | "LaTeX" => 1,
+        // Data / query-ish.
+        "SQL" => 2,
+        // Shell / scripts.
+        "Shell" | "PowerShell" | "Batch" | "Vimscript" => 3,
+        // Everything else is a "real" source language — highest priority.
+        _ => 10,
+    }
 }
 
 /// Detects the primary language of a directory by counting file
@@ -133,9 +151,11 @@ impl Detector for LanguageDetector {
         if counts.is_empty() {
             return Ok(None);
         }
+        // Weighted pick: primary source language beats styling/markup even
+        // when outnumbered. Ties (same weight) break by raw file count.
         let primary = counts
             .into_iter()
-            .max_by_key(|(_, n)| *n)
+            .max_by_key(|(lang, n)| (lang_weight(lang), *n))
             .map(|(l, _)| l.to_string());
         Ok(primary.map(|language| Detection {
             language: Some(language),

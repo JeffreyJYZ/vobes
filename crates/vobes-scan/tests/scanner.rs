@@ -142,3 +142,33 @@ fn scan_via_trait_object() {
     assert_eq!(d.package_manager.as_deref(), Some("go"));
     assert_eq!(d.language.as_deref(), Some("Go"));
 }
+
+#[test]
+fn nextjs_prefers_typescript_over_css() {
+    // A Next.js app: many .css files but the source is TypeScript/TSX.
+    let dir = fixture("nextjs");
+    write(
+        &dir,
+        "package.json",
+        r#"{"dependencies":{"next":"14","react":"18"}}"#,
+    );
+    write(&dir, "tsconfig.json", "{}");
+    write(&dir, "pages/index.tsx", "export default () => null;\n");
+    write(&dir, "pages/about.tsx", "export default () => null;\n");
+    // More CSS than TSX on purpose.
+    for i in 0..10 {
+        write(
+            &dir,
+            &format!("styles/{i}.module.css"),
+            ".x { color: red; }\n",
+        );
+    }
+    write(&dir, "global.css", "body { margin: 0; }\n");
+
+    let scanner = DefaultScanner::with_standard_detectors().with_max_depth(4);
+    let report = scanner.scan_report(&dir).unwrap();
+    assert_eq!(report.count(), 1);
+    let (_, detection) = &report.vobes[0];
+    // Source language must beat styling/markup even when outnumbered.
+    assert_eq!(detection.language.as_deref(), Some("TypeScript"));
+}
