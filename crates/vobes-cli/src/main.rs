@@ -5,7 +5,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, rust_2018_idioms, clippy::all)]
 
-mod app;
 mod commands;
 mod output;
 
@@ -31,18 +30,35 @@ pub enum Command {
     /// Discover projects in configured roots.
     Scan,
     /// List all tracked vobes.
-    List,
+    List {
+        /// Emit raw JSON instead of a table (for AI agents / scripting).
+        #[clap(long)]
+        json: bool,
+    },
     /// Inspect one vobe in detail.
     Show {
         /// Vobe name or path.
         name: String,
+        /// Emit raw JSON instead of a formatted view (for AI agents / scripting).
+        #[clap(long)]
+        json: bool,
     },
     /// Show activity timeline.
     Log {
         /// Limit number of events.
         #[clap(long, default_value = "20")]
         limit: usize,
+        /// Emit raw JSON instead of a formatted view (for AI agents / scripting).
+        #[clap(long)]
+        json: bool,
     },
+    /// Dump a compact context pack (full vobe + recent activity) as JSON.
+    Context {
+        /// Vobe name or path.
+        name: String,
+    },
+    /// Stream activity as newline-delimited JSON (NDJSON). Ctrl-C to stop.
+    Watch,
     /// Re-scan, refresh git cache, record activity.
     Sync,
     /// Manually add a vobe for a path.
@@ -86,7 +102,7 @@ fn main() -> std::process::ExitCode {
             println!("Run `vbs --help` to see commands.");
             std::process::ExitCode::SUCCESS
         }
-        Some(cmd) => match app::App::load() {
+        Some(cmd) => match vobes_cli::app::App::load() {
             Ok(app) => match dispatch(&app, cmd) {
                 Ok(()) => std::process::ExitCode::SUCCESS,
                 Err(e) => {
@@ -102,12 +118,14 @@ fn main() -> std::process::ExitCode {
     }
 }
 
-fn dispatch(app: &app::App, cmd: Command) -> vobes_core::Result<()> {
+fn dispatch(app: &vobes_cli::app::App, cmd: Command) -> vobes_core::Result<()> {
     match cmd {
         Command::Scan => commands::scan::run(app),
-        Command::List => commands::list::run(app),
-        Command::Show { name } => commands::show::run(app, &name),
-        Command::Log { limit } => commands::log::run(app, limit),
+        Command::List { json } => commands::list::run(app, json),
+        Command::Show { name, json } => commands::show::run(app, &name, json),
+        Command::Log { limit, json } => commands::log::run(app, limit, json),
+        Command::Context { name } => commands::context::run(app, &name),
+        Command::Watch => commands::watch::run(app),
         Command::Sync => commands::sync::run(app),
         Command::Add { path } => commands::add::run(app, &path),
         Command::Rm { name } => commands::rm::run(app, &name),

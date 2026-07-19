@@ -7,6 +7,10 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[lib]
+name = "vobes_cli"
+path = "src/lib.rs"
+
 [[bin]]
 name = "vbs"
 path = "src/main.rs"

@@ -2,8 +2,8 @@
 
 use vobes_core::{ActivityEvent, ActivityKind, Result};
 
-use crate::app::App;
 use crate::commands::shared::{absolute_normalized, vobe_from_detection};
+use vobes_cli::app::App;
 
 pub fn run(app: &App) -> Result<()> {
     let roots = app.config.resolved_roots();

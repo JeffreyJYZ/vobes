@@ -5,10 +5,10 @@ use std::collections::HashMap;
 use vobes_core::Result;
 use vobes_store::Sort;
 
-use crate::app::App;
 use crate::output;
+use vobes_cli::app::App;
 
-pub fn run(app: &App, limit: usize) -> Result<()> {
+pub fn run(app: &App, limit: usize, json: bool) -> Result<()> {
     let vobes = app
         .store
         .list_vobes(&vobes_store::Filter::all(), Sort::Name)?;
@@ -17,6 +17,10 @@ pub fn run(app: &App, limit: usize) -> Result<()> {
         .map(|v| (v.id.clone(), v.name.clone()))
         .collect();
     let events = app.store.recent_activity(limit)?;
-    output::render_activity(&events, |id| names.get(id).cloned());
+    if json {
+        output::print_json(&events)?;
+    } else {
+        output::render_activity(&events, |id| names.get(id).cloned());
+    }
     Ok(())
 }

@@ -4394,6 +4394,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "vobes-mcp"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "vobes-cli",
+ "vobes-config",
+ "vobes-core",
+ "vobes-store",
+]
+
+[[package]]
 name = "vobes-scan"
 version = "0.1.0"
 dependencies = [

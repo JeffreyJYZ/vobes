@@ -22,16 +22,23 @@ Any AI agent can shell out to `vbs` and parse the JSON.
 
 ### 2. MCP Server
 
-A future `vobes-mcp` crate exposing Vobes data via the Model Context
-Protocol. Lives in the same monorepo, reuses core.
+A `vobes-mcp` crate exposes Vobes data via the Model Context Protocol.
+Speaks JSON-RPC 2.0 over stdio (no external MCP SDK — minimal deps).
+Lives in the same monorepo, reuses `vobes-cli::app::App`.
 
 Tools exposed:
 
-- `vobes.list` — list vobes
-- `vobes.show` — show one vobe
-- `vobes.recent_activity` — recent events
-- `vobes.search` — find by tag/notes/path
-- `vobes.context` — full structured context for a vobe
+- `vobes_list` — list vobes
+- `vobes_show` — show one vobe (+ recent activity)
+- `vobes_recent_activity` — recent events
+- `vobes_search` — find by name substring
+- `vobes_context` — full structured context for a vobe (record + activity + dir entries)
+
+Run it:
+
+```bash
+cargo run -p vobes-mcp
+```
 
 ### 3. Watch Stream
 
@@ -39,8 +46,11 @@ Tools exposed:
 pipe). Agents subscribe to live events.
 
 ```bash
-vbs watch --format ndjson
+vbs watch
 ```
+
+Emits NDJSON: a `{"type":"ready"}` line on start, then one JSON object
+per new activity event per second. Stop with Ctrl-C.
 
 ## Why It Fits Naturally
 

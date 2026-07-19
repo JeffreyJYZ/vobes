@@ -1,0 +1,20 @@
+[package]
+name = "vobes-mcp"
+description = "Vobes Model Context Protocol server — expose projects, git, and activity to AI agents."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "vobes-mcp"
+path = "src/main.rs"
+
+[dependencies]
+vobes-core = { workspace = true }
+vobes-store = { workspace = true }
+vobes-config = { workspace = true }
+vobes-cli = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

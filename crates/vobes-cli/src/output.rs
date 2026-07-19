@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use comfy_table::{ContentArrangement, Table};
+use serde::Serialize;
 
 use vobes_core::{ActivityEvent, Vobe};
 
@@ -121,6 +122,13 @@ pub fn render_vobe_detail(v: &Vobe) {
             println!("            {} ({})", c.author, relative(c.date));
         }
     }
+}
+
+/// Serialize any value as pretty JSON to stdout.
+pub fn print_json<T: Serialize>(value: &T) -> vobes_core::Result<()> {
+    let s = serde_json::to_string_pretty(value)?;
+    println!("{s}");
+    Ok(())
 }
 
 /// Render an activity timeline.

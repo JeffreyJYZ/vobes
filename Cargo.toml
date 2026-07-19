@@ -8,6 +8,7 @@ members = [
     "crates/vobes-store",
     "crates/vobes-config",
     "crates/vobes-cli",
+    "crates/vobes-mcp",
     "desktop/src-tauri",
 ]
 # Skip desktop by default so core CLI stays fast to build/test.
@@ -19,6 +20,7 @@ default-members = [
     "crates/vobes-store",
     "crates/vobes-config",
     "crates/vobes-cli",
+    "crates/vobes-mcp",
 ]
 
 [workspace.package]

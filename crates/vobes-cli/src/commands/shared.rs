@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use vobes_core::{normalize, Result, Vobe};
 use vobes_scan::Detection;
 
-use crate::app::App;
+use vobes_cli::app::App;
 
 /// Make a path absolute against the current working directory, then
 /// normalize separators/dots. Stable across platforms and input styles.

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use vobes_core::Result;
 
-use crate::app::App;
+use vobes_cli::app::App;
 
 pub fn run(app: &App, out: Option<&str>) -> Result<()> {
     let path = match out {

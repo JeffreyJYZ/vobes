@@ -4,7 +4,7 @@ use std::fs;
 
 use vobes_core::Result;
 
-use crate::app::App;
+use vobes_cli::app::App;
 
 const DEFAULT_CONFIG: &str = r#"# Vobes configuration. Edit and rerun `vbs scan`.
 

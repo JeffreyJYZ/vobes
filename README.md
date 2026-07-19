@@ -46,6 +46,26 @@ vbs rm <name>        # untrack a vobe
 vbs export           # dump all data as JSON to ~/.vobes/snapshots/
 ```
 
+### For AI agents
+
+Vobes exposes its data to agents in three ways:
+
+```bash
+vbs list --json       # machine-readable vobe list
+vbs show <name> --json # machine-readable vobe detail
+vbs log --json        # machine-readable activity
+vbs context <name>    # full context pack (record + activity + dir entries)
+vbs watch             # stream activity as NDJSON
+```
+
+Or run the MCP server (JSON-RPC 2.0 over stdio):
+
+```bash
+cargo run -p vobes-mcp
+```
+
+Tools: `vobes_list`, `vobes_show`, `vobes_search`, `vobes_recent_activity`, `vobes_context`.
+
 ## Desktop (Tauri)
 
 ### Prerequisites
