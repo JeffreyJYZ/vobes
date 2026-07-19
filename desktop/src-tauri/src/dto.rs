@@ -3,8 +3,10 @@
 use serde::{Deserialize, Serialize};
 
 /// Vobe DTO — a trimmed view of `vobes_core::Vobe` for IPC.
+///
+/// Field names are serialized as-is (snake_case) to match the frontend
+/// TypeScript types exactly (no camelCase rename).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct VobeDto {
     pub id: String,
     pub name: String,
@@ -22,7 +24,6 @@ pub struct VobeDto {
 
 /// Git info DTO.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct GitInfoDto {
     pub branch: String,
     pub dirty: bool,
@@ -33,7 +34,6 @@ pub struct GitInfoDto {
 
 /// Commit DTO.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CommitDto {
     pub hash: String,
     pub message: String,
@@ -43,7 +43,6 @@ pub struct CommitDto {
 
 /// Activity event DTO.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ActivityDto {
     pub id: Option<u64>,
     pub vobe_id: String,
@@ -91,5 +90,26 @@ impl From<&vobes_core::ActivityEvent> for ActivityDto {
             timestamp: e.timestamp.to_rfc3339(),
             detail: e.detail.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vobes_core::{ActivityEvent, ActivityKind, Vobe, VobeId};
+
+    #[test]
+    fn dto_fields_use_snake_case_to_match_frontend() {
+        let vobe = Vobe::new("demo", std::path::Path::new("/tmp/demo"));
+        let dto = VobeDto::from(&vobe);
+        let json = serde_json::to_string(&dto).unwrap();
+        assert!(json.contains("\"package_manager\""), "got {json}");
+        assert!(json.contains("\"last_modified\""), "got {json}");
+
+        let ev = ActivityEvent::now(VobeId::from_string("abc"), ActivityKind::Opened);
+        let adto = ActivityDto::from(&ev);
+        let ajson = serde_json::to_string(&adto).unwrap();
+        assert!(ajson.contains("\"vobe_id\""), "got {ajson}");
+        assert!(!ajson.contains("\"vobeId\""), "camelCase leak: {ajson}");
     }
 }
