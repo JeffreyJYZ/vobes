@@ -84,11 +84,20 @@ jobs:
       - name: build CLI binary
         run: cargo build --release -p vobes-cli
 
+      - name: install intel mac target
+        if: matrix.platform == 'macos'
+        run: rustup target add x86_64-apple-darwin
+
+      - name: build CLI binary (intel mac)
+        if: matrix.platform == 'macos'
+        run: cargo build --release -p vobes-cli --target x86_64-apple-darwin
+
       - name: package CLI binary (macos)
         if: matrix.platform == 'macos'
         run: |
           mkdir -p cli
           cp target/release/vbs cli/vbs-macos-aarch64
+          cp target/x86_64-apple-darwin/release/vbs cli/vbs-macos-x64
 
       - name: package CLI binary (linux)
         if: matrix.platform == 'linux'
