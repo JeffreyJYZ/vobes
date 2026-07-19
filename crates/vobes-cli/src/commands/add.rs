@@ -1,15 +1,14 @@
 //! `vbs add <path>` — manually track a vobe.
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use vobes_core::{ActivityEvent, ActivityKind, Result};
 
 use crate::app::App;
-use crate::commands::shared::vobe_from_detection;
+use crate::commands::shared::{absolute_normalized, vobe_from_detection};
 
 pub fn run(app: &App, path: &str) -> Result<()> {
-    let abs = std::path::absolute(PathBuf::from(path))
-        .map_err(|e| vobes_core::Error::internal(format!("resolve path: {e}")))?;
+    let abs = absolute_normalized(Path::new(path));
     if !abs.exists() {
         return Err(vobes_core::Error::not_found(abs.display().to_string()));
     }

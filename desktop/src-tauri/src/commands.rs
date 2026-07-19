@@ -1,6 +1,6 @@
 //! Tauri command handlers — same core, just exposed to the frontend.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tauri::State;
@@ -8,7 +8,7 @@ use tauri::State;
 use vobes_core::{ActivityEvent, ActivityKind, Result};
 use vobes_store::{Filter, Sort};
 
-use crate::commands::shared::{lookup_vobe, vobe_from_detection};
+use crate::commands::shared::{absolute_normalized, lookup_vobe, vobe_from_detection};
 use crate::ctx::DesktopCtx;
 use crate::dto::{ActivityDto, VobeDto};
 
@@ -63,7 +63,7 @@ pub async fn scan(state: State<'_, Arc<DesktopCtx>>) -> Result<usize> {
         }
         let pairs = state.scanner.scan(&root)?;
         for (path, detection) in pairs {
-            let path = std::path::absolute(&path).unwrap_or(path);
+            let path = absolute_normalized(&path);
             if state.store.get_vobe_by_path(&path)?.is_some() {
                 continue;
             }
@@ -94,7 +94,7 @@ pub async fn sync(state: State<'_, Arc<DesktopCtx>>) -> Result<(usize, usize)> {
         }
         let pairs = state.scanner.scan(&root)?;
         for (path, detection) in pairs {
-            let path = std::path::absolute(&path).unwrap_or(path);
+            let path = absolute_normalized(&path);
             let existing = state.store.get_vobe_by_path(&path)?;
             let mut vobe = vobe_from_detection(&path, &detection)?;
             if let Some(prev) = existing {
@@ -123,8 +123,7 @@ pub async fn sync(state: State<'_, Arc<DesktopCtx>>) -> Result<(usize, usize)> {
 /// Manually add a vobe for a path.
 #[tauri::command]
 pub async fn add_vobe(state: State<'_, Arc<DesktopCtx>>, path: String) -> Result<VobeDto> {
-    let abs = std::path::absolute(PathBuf::from(&path))
-        .map_err(|e| vobes_core::Error::internal(format!("resolve path: {e}")))?;
+    let abs = absolute_normalized(Path::new(&path));
     if !abs.exists() {
         return Err(vobes_core::Error::not_found(abs.display().to_string()));
     }
@@ -193,26 +192,38 @@ pub async fn export_json(state: State<'_, Arc<DesktopCtx>>, out: Option<String>)
 
 /// Shared helpers reused from CLI logic. Kept private to this module.
 pub mod shared {
-    use std::path::Path;
-    use vobes_core::{Result, Vobe};
+    use std::path::{Path, PathBuf};
+    use vobes_core::{normalize, Result, Vobe};
     use vobes_scan::Detection;
     use vobes_store::Store;
+
+    /// Make a path absolute against the current working directory, then
+    /// normalize separators/dots. Stable across platforms and input styles.
+    pub fn absolute_normalized(path: &Path) -> PathBuf {
+        let abs = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            std::env::current_dir().unwrap_or_default().join(path)
+        };
+        normalize(&abs)
+    }
 
     /// Build a `Vobe` from a `(path, detection)` pair, pulling git info if
     /// the detection reports a repo.
     pub fn vobe_from_detection(path: &Path, detection: &Detection) -> Result<Vobe> {
+        let path = absolute_normalized(path);
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("project")
             .to_string();
-        let mut vobe = Vobe::new(name, path.to_path_buf());
+        let mut vobe = Vobe::new(name, &path);
         vobe.framework = detection.framework.clone();
         vobe.language = detection.language.clone();
         vobe.package_manager = detection.package_manager.clone();
         vobe.touch_modified();
         if detection.is_repo {
-            if let Some(git) = vobes_git::read_git_info(path)? {
+            if let Some(git) = vobes_git::read_git_info(&path)? {
                 vobe = vobe.with_git(git);
             }
         }

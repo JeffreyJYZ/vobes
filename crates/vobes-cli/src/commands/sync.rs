@@ -3,7 +3,7 @@
 use vobes_core::{ActivityEvent, ActivityKind, Result};
 
 use crate::app::App;
-use crate::commands::shared::vobe_from_detection;
+use crate::commands::shared::{absolute_normalized, vobe_from_detection};
 
 pub fn run(app: &App) -> Result<()> {
     let roots = app.config.resolved_roots();
@@ -16,7 +16,7 @@ pub fn run(app: &App) -> Result<()> {
         }
         let pairs = app.scanner.scan(root)?;
         for (path, detection) in pairs {
-            let path = std::path::absolute(&path).unwrap_or(path);
+            let path = absolute_normalized(&path);
             let existing = app.store.get_vobe_by_path(&path)?;
             let mut vobe = vobe_from_detection(&path, &detection)?;
             if let Some(prev) = existing {

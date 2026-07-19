@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
-use vobes_core::{ActivityEvent, ActivityKind, Commit, GitInfo, Result, Vobe, VobeId};
+use vobes_core::{normalize, ActivityEvent, ActivityKind, Commit, GitInfo, Result, Vobe, VobeId};
 
 use crate::model::{Filter, Sort};
 use crate::schema::migrate;
@@ -123,7 +123,7 @@ impl Store for SqliteStore {
                 params![
                     vobe.id.as_str(),
                     vobe.name,
-                    vobe.path.to_string_lossy(),
+                    vobes_core::normalize(&vobe.path).to_string_lossy(),
                     vobe.framework,
                     vobe.language,
                     vobe.package_manager,
@@ -158,7 +158,8 @@ impl Store for SqliteStore {
     }
 
     fn get_vobe_by_path(&self, path: &Path) -> Result<Option<Vobe>> {
-        let s = path.to_string_lossy();
+        let normalized = normalize(path);
+        let s = normalized.to_string_lossy();
         self.with_conn(|conn| fetch_vobe(conn, "path = ?1", params![s.as_ref()]))
     }
 
@@ -361,7 +362,7 @@ fn upsert_vobe_inline(conn: &Connection, vobe: &Vobe) -> Result<()> {
         params![
             vobe.id.as_str(),
             vobe.name,
-            vobe.path.to_string_lossy(),
+            vobes_core::normalize(&vobe.path).to_string_lossy(),
             vobe.framework,
             vobe.language,
             vobe.package_manager,
@@ -465,7 +466,7 @@ fn row_to_vobe(row: &rusqlite::Row<'_>) -> rusqlite::Result<Vobe> {
     Ok(Vobe {
         id: VobeId::from_string(id),
         name,
-        path: PathBuf::from(path),
+        path: normalize(&PathBuf::from(path)),
         git,
         framework,
         language,

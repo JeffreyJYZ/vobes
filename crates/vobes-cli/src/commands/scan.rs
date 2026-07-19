@@ -1,10 +1,11 @@
 //! `vbs scan` — discover projects in configured roots.
 
+use std::collections::HashSet;
+
 use vobes_core::{ActivityEvent, ActivityKind, Result};
 
 use crate::app::App;
-use crate::commands::shared::vobe_from_detection;
-use std::collections::HashSet;
+use crate::commands::shared::{absolute_normalized, vobe_from_detection};
 
 pub fn run(app: &App) -> Result<()> {
     let roots = app.config.resolved_roots();
@@ -34,7 +35,7 @@ pub fn run(app: &App) -> Result<()> {
         bar.println(format!("scanning {}", root.display()));
         let pairs = app.scanner.scan(root)?;
         for (path, detection) in pairs {
-            let path = std::path::absolute(&path).unwrap_or(path);
+            let path = absolute_normalized(&path);
             // Skip if already tracked by path
             if app.store.get_vobe_by_path(&path)?.is_some() {
                 continue;

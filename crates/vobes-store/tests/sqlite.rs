@@ -203,3 +203,35 @@ fn open_creates_db_file() {
     let _store = SqliteStore::open(&p).unwrap();
     assert!(p.exists(), "db file should be created");
 }
+
+#[test]
+fn path_lookup_is_separator_agnostic() {
+    // Backslash and forward slash forms should both resolve to the same vobe.
+    let store = SqliteStore::open_in_memory().unwrap();
+    let mut v = sample_vobe("norm");
+    v.path = PathBuf::from("/tmp/vobe-norm");
+    store.upsert_vobe(&v).unwrap();
+
+    let fwd = store
+        .get_vobe_by_path(&PathBuf::from("/tmp/vobe-norm"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(fwd.name, "norm");
+
+    // Same path with double slash and trailing slash should still match.
+    let messy = store
+        .get_vobe_by_path(&PathBuf::from("/tmp//vobe-norm/"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(messy.name, "norm");
+
+    // Storing with backslash form should round-trip to normalized form.
+    let mut w = sample_vobe("win");
+    w.path = PathBuf::from("/tmp/vobe-win");
+    store.upsert_vobe(&w).unwrap();
+    let by_back = store
+        .get_vobe_by_path(&PathBuf::from("/tmp\\vobe-win"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(by_back.name, "win");
+}

@@ -14,10 +14,11 @@ A **vobe** is one software project managed by Vobes.
 
 ## Status
 
-Pre-alpha. Phase 0 scaffolding. See [`design/`](./design/) for the full
+Pre-alpha. Phases 0-9 implemented: core, scanning, git, activity, SQLite
+store, config, CLI, desktop. See [`design/`](./design/) for the full
 plan.
 
-## Quick start
+## Quick start (CLI)
 
 ```bash
 cargo build -p vobes-cli
@@ -44,6 +45,29 @@ vbs add <path>       # manually track a project
 vbs rm <name>        # untrack a vobe
 vbs export           # dump all data as JSON to ~/.vobes/snapshots/
 ```
+
+## Desktop (Tauri)
+
+### Prerequisites
+
+- Rust stable
+- Node 20+ and pnpm 9+
+- macOS: Xcode CLI tools
+- Linux: `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev
+  librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev`
+- Windows: WebView2 runtime (preinstalled on Windows 11)
+
+### Build
+
+```bash
+cd desktop
+pnpm install
+cargo tauri dev        # hot-reload dev loop (frontend + rust)
+cargo tauri build      # produce installable bundle (in desktop/src-tauri/target/release/bundle)
+```
+
+The desktop app uses the same core as the CLI — same config file, same
+SQLite store, same scanner.
 
 ## Design
 

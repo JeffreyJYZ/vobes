@@ -9,11 +9,13 @@
 pub mod activity;
 pub mod error;
 pub mod git;
+pub mod path;
 pub mod vobe;
 
 pub use activity::{ActivityEvent, ActivityKind};
 pub use error::{Error, ParseIdError, Result, VobeId};
 pub use git::{Commit, GitInfo};
+pub use path::{normalize, normalize_str};
 pub use vobe::{Vobe, ARCHIVED_TAG};
 
 /// Re-export chrono DateTime for downstream convenience.
