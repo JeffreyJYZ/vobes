@@ -10,7 +10,7 @@ env:
 
 jobs:
   release:
-    name: release (${{ matrix.os }})
+    name: release (${{ matrix.platform }})
     strategy:
       fail-fast: false
       matrix:
@@ -19,6 +19,8 @@ jobs:
             platform: macos
           - os: ubuntu-latest
             platform: linux
+          - os: ubuntu-22.04-arm
+            platform: linux-arm
           - os: windows-latest
             platform: windows
     runs-on: ${{ matrix.os }}
@@ -27,11 +29,17 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: install mac targets (universal)
+        if: matrix.platform == 'macos'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
       - uses: pnpm/action-setup@v4
+        if: matrix.platform != 'linux-arm'
         with:
           version: 9
 
       - uses: actions/setup-node@v4
+        if: matrix.platform != 'linux-arm'
         with:
           node-version: 20
           cache: pnpm
@@ -47,6 +55,7 @@ jobs:
             build-essential curl wget file
 
       - name: install frontend deps
+        if: matrix.platform != 'linux-arm'
         working-directory: desktop
         run: pnpm install --frozen-lockfile
 
@@ -54,7 +63,8 @@ jobs:
         with:
           workspaces: "desktop/src-tauri -> target"
 
-      - name: build + publish
+      - name: build + publish desktop (skip linux-arm)
+        if: matrix.platform != 'linux-arm'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -77,16 +87,14 @@ jobs:
             Vobes ${{ github.ref_name }} — pre-alpha.
 
             Desktop app (unsigned): expect Gatekeeper / SmartScreen warnings on first run.
-            CLI binary `vbs` for each platform is attached as `vbs-<platform>-<arch>[.exe]`.
+            macOS desktop bundle is universal (arm64 + x64).
+            CLI binary `vbs` for each platform/arch is attached as `vbs-<platform>-<arch>[.exe]`.
           releaseDraft: true
           prerelease: false
+          args: ${{ matrix.platform == 'macos' && '--target universal-apple-darwin' || '' }}
 
-      - name: build CLI binary
+      - name: build CLI binary (native)
         run: cargo build --release -p vobes-cli
-
-      - name: install intel mac target
-        if: matrix.platform == 'macos'
-        run: rustup target add x86_64-apple-darwin
 
       - name: build CLI binary (intel mac)
         if: matrix.platform == 'macos'
@@ -99,11 +107,17 @@ jobs:
           cp target/release/vbs cli/vbs-macos-aarch64
           cp target/x86_64-apple-darwin/release/vbs cli/vbs-macos-x64
 
-      - name: package CLI binary (linux)
+      - name: package CLI binary (linux x64)
         if: matrix.platform == 'linux'
         run: |
           mkdir -p cli
           cp target/release/vbs cli/vbs-linux-x64
+
+      - name: package CLI binary (linux arm64)
+        if: matrix.platform == 'linux-arm'
+        run: |
+          mkdir -p cli
+          cp target/release/vbs cli/vbs-linux-aarch64
 
       - name: package CLI binary (windows)
         if: matrix.platform == 'windows'
