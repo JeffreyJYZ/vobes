@@ -159,7 +159,10 @@
         </button>
       </div>
       {#if vobes.length === 0}
-        <div class="empty">No vobes yet. Click Scan to discover projects.</div>
+        <div class="empty">
+          <strong>No vobes yet</strong>
+          Click <em>Scan</em> to discover projects in your configured roots.
+        </div>
       {:else}
         <div class="vobe-grid">
           {#each vobes as v (v.id)}
@@ -192,6 +195,7 @@
                 {/if}
                 <span class="badge">{relative(v.last_modified)}</span>
               </div>
+              <div class="path">{v.path}</div>
             </button>
           {/each}
         </div>
@@ -214,20 +218,31 @@
       </div>
       {#if selected}
         <button on:click={() => (selected = null)}>← Back</button>
-        <div style="margin-top: 16px;">
-          <div><strong>Path:</strong> {selected.path}</div>
-          <div><strong>Language:</strong> {selected.language ?? "-"}</div>
-          <div><strong>Framework:</strong> {selected.framework ?? "-"}</div>
-          <div>
-            <strong>Package manager:</strong>
-            {selected.package_manager ?? "-"}
+        <div class="detail-card">
+          <div class="detail-grid">
+            <div class="k">Path</div>
+            <div class="v" style="font-family: ui-monospace, Menlo, monospace; font-size: 12px;">{selected.path}</div>
+            <div class="k">Language</div>
+            <div class="v">{selected.language ?? "-"}</div>
+            <div class="k">Framework</div>
+            <div class="v">{selected.framework ?? "-"}</div>
+            <div class="k">Package manager</div>
+            <div class="v">{selected.package_manager ?? "-"}</div>
+            <div class="k">Tags</div>
+            <div class="v">{selected.tags.join(", ") || "-"}</div>
           </div>
-          <div><strong>Tags:</strong> {selected.tags.join(", ") || "-"}</div>
           {#if selected.git}
-            <h3 style="margin-top: 16px;">Git</h3>
-            <div>Branch: {selected.git.branch}</div>
-            <div>Dirty: {selected.git.dirty}</div>
-            <div>Ahead/behind: ↑{selected.git.ahead} ↓{selected.git.behind}</div>
+            <div class="section-title">Git</div>
+            <div class="detail-grid">
+              <div class="k">Branch</div>
+              <div class="v">{selected.git.branch}</div>
+              <div class="k">Status</div>
+              <div class="v">
+                {selected.git.dirty ? "dirty" : "clean"}
+                {#if selected.git.ahead > 0} · ↑{selected.git.ahead}{/if}
+                {#if selected.git.behind > 0} · ↓{selected.git.behind}{/if}
+              </div>
+            </div>
           {/if}
         </div>
         <button
@@ -249,6 +264,7 @@
                 <span>·</span>
                 <span>{v.package_manager ?? "-"}</span>
               </div>
+              <div class="path">{v.path}</div>
             </button>
           {/each}
         </div>
