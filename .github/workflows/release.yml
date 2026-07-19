@@ -73,6 +73,39 @@ jobs:
           projectPath: desktop
           tagName: ${{ github.ref_name }}
           releaseName: "Vobes ${{ github.ref_name }}"
-          releaseBody: "See CHANGELOG / assets below."
+          releaseBody: |
+            Vobes ${{ github.ref_name }} — pre-alpha.
+
+            Desktop app (unsigned): expect Gatekeeper / SmartScreen warnings on first run.
+            CLI binary `vbs` for each platform is attached as `vbs-<platform>-<arch>[.exe]`.
           releaseDraft: true
           prerelease: false
+
+      - name: build CLI binary
+        run: cargo build --release -p vobes-cli
+
+      - name: package CLI binary (macos)
+        if: matrix.platform == 'macos'
+        run: |
+          mkdir -p cli
+          cp target/release/vbs cli/vbs-macos-aarch64
+
+      - name: package CLI binary (linux)
+        if: matrix.platform == 'linux'
+        run: |
+          mkdir -p cli
+          cp target/release/vbs cli/vbs-linux-x64
+
+      - name: package CLI binary (windows)
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          mkdir -p cli
+          cp target/release/vbs.exe cli/vbs-windows-x64.exe
+
+      - name: upload CLI to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          files: cli/*

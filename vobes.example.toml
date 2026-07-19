@@ -1,5 +1,11 @@
+# Example Vobes configuration.
+# real config lives at:
+#   macOS/Linux: ~/.config/vobes/config.toml
+#   Windows:     %APPDATA%\vobes\config.toml
+# `vbs init` writes a default there for you.
+
 [general]
-name = "Personal Workspace"
+name = "My Workspace"
 
 [scan]
 roots = ["~/dev", "~/work"]

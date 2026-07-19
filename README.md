@@ -14,9 +14,9 @@ A **vobe** is one software project managed by Vobes.
 
 ## Status
 
-Pre-alpha. Phases 0-9 implemented: core, scanning, git, activity, SQLite
-store, config, CLI, desktop. See [`design/`](./design/) for the full
-plan.
+Pre-alpha. Phases 0-10 implemented: core, scanning, git, activity, SQLite
+store, config, CLI, desktop, and an MCP server for AI agents. See
+[`design/`](./design/) for the full plan.
 
 ## Quick start (CLI)
 
