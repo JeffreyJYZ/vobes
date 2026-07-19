@@ -40,6 +40,8 @@ pub trait Store: Send + Sync {
     fn export_json(&self, path: &Path) -> Result<()>;
     /// Import data from a previous JSON export.
     fn import_json(&self, path: &Path) -> Result<()>;
+    /// Delete every vobe and all activity. Dangerous — used by reset.
+    fn purge_all(&self) -> Result<()>;
 }
 
 /// Blanket impl so `Arc<dyn Store>` / `Box<dyn Store>` can be used as a
@@ -77,5 +79,8 @@ impl<S: Store + ?Sized> Store for std::sync::Arc<S> {
     }
     fn import_json(&self, path: &Path) -> Result<()> {
         (**self).import_json(path)
+    }
+    fn purge_all(&self) -> Result<()> {
+        (**self).purge_all()
     }
 }

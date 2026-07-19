@@ -65,6 +65,28 @@
     }
   }
 
+  async function resetAndRescan() {
+    if (
+      !window.confirm(
+        "Reset & Rescan will DELETE every vobe and all activity. This cannot be undone. Continue?",
+      )
+    ) {
+      return;
+    }
+    loading = true;
+    error = null;
+    try {
+      const found = await invoke<number>("reset_and_rescan");
+      await refresh();
+      error = null;
+      alert(`Reset complete — ${found} vobes re-discovered.`);
+    } catch (e) {
+      error = String(e);
+    } finally {
+      loading = false;
+    }
+  }
+
   function relative(ts: string | null): string {
     if (!ts) return "-";
     const d = new Date(ts);
@@ -183,9 +205,18 @@
     {:else if view === "projects"}
       <div class="view-head">
         <h2>{selected ? selected.name : "Projects"}</h2>
-        <button class="primary" on:click={scan} disabled={loading}>
-          {loading ? "Scanning…" : "Rescan"}
-        </button>
+        <div class="view-actions">
+          <button class="primary" on:click={scan} disabled={loading}>
+            {loading ? "Scanning…" : "Rescan"}
+          </button>
+          <button
+            class="danger"
+            on:click={resetAndRescan}
+            disabled={loading}
+          >
+            Reset &amp; Rescan
+          </button>
+        </div>
       </div>
       {#if selected}
         <button on:click={() => (selected = null)}>← Back</button>

@@ -218,6 +218,16 @@ impl Store for SqliteStore {
         })
     }
 
+    fn purge_all(&self) -> Result<()> {
+        self.with_conn(|conn| {
+            conn.execute("DELETE FROM activity", [])
+                .map_err(|e| vobes_core::Error::storage(format!("purge activity: {e}")))?;
+            conn.execute("DELETE FROM vobes", [])
+                .map_err(|e| vobes_core::Error::storage(format!("purge vobes: {e}")))?;
+            Ok(())
+        })
+    }
+
     fn record_activity(&self, event: &ActivityEvent) -> Result<()> {
         self.with_conn(|conn| {
             conn.execute(

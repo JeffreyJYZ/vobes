@@ -33,6 +33,7 @@ pub fn run() {
             commands::recent_activity,
             commands::vobe_activity,
             commands::scan,
+            commands::reset_and_rescan,
             commands::sync,
             commands::add_vobe,
             commands::remove_vobe,

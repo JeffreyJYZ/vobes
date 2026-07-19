@@ -76,6 +76,12 @@ pub enum Command {
         /// Vobe name.
         name: String,
     },
+    /// Dangerously purge all vobes + activity, then re-scan from scratch.
+    Reset {
+        /// Skip the confirmation prompt.
+        #[clap(long)]
+        yes: bool,
+    },
     /// Export all data as JSON.
     Export {
         /// Optional custom output path. Defaults to config export path.
@@ -130,6 +136,7 @@ fn dispatch(app: &vobes_cli::app::App, cmd: Command) -> vobes_core::Result<()> {
         Command::Add { path } => commands::add::run(app, &path),
         Command::Rm { name } => commands::rm::run(app, &name),
         Command::Open { name } => commands::open::run(app, &name),
+        Command::Reset { yes } => commands::reset::run(app, yes),
         Command::Export { out } => commands::export::run(app, out.as_deref()),
         Command::Init => commands::init::run(app),
     }

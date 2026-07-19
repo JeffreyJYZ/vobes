@@ -79,6 +79,38 @@ pub async fn scan(state: State<'_, Arc<DesktopCtx>>) -> Result<usize> {
     Ok(found)
 }
 
+/// Dangerous: purge every vobe and all activity, then re-scan from scratch.
+///
+/// The frontend must confirm with the user before calling this — there is
+/// no undo. Stale entries (e.g. old `src-tauri` vobes) linger until this
+/// runs, since normal scan only adds, never removes.
+#[tauri::command]
+pub async fn reset_and_rescan(state: State<'_, Arc<DesktopCtx>>) -> Result<usize> {
+    let _guard = state
+        .scan_lock
+        .lock()
+        .map_err(|e| vobes_core::Error::internal(format!("scan lock: {e}")))?;
+    state.store.purge_all()?;
+    let mut found = 0usize;
+    for root in state.config.resolved_roots() {
+        if !root.exists() {
+            continue;
+        }
+        let pairs = state.scanner.scan(&root)?;
+        for (path, detection) in pairs {
+            let path = absolute_normalized(&path);
+            let vobe = vobe_from_detection(&path, &detection)?;
+            state.store.upsert_vobe(&vobe)?;
+            state.store.record_activity(
+                &ActivityEvent::now(vobe.id.clone(), ActivityKind::Scanned)
+                    .with_detail("desktop reset+rescan"),
+            )?;
+            found += 1;
+        }
+    }
+    Ok(found)
+}
+
 /// Sync: re-scan roots, refresh existing vobes, add new ones.
 #[tauri::command]
 pub async fn sync(state: State<'_, Arc<DesktopCtx>>) -> Result<(usize, usize)> {

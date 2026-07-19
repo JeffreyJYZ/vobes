@@ -132,6 +132,21 @@ button.primary:hover {
   gap: 12px;
 }
 
+.view-actions {
+  display: flex;
+  gap: 8px;
+}
+
+button.danger {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+
+button.danger:hover {
+  filter: brightness(1.1);
+}
+
 .vobe-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
