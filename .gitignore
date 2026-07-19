@@ -26,3 +26,5 @@ desktop/src-tauri/gen/
 **/secrets.toml
 .env
 .env.*
+# Zed editor
+.zed/
