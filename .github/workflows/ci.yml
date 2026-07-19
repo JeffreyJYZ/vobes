@@ -30,11 +30,11 @@ jobs:
 
       - name: clippy
         if: always()
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --exclude vobes-desktop --all-targets -- -D warnings
 
       - name: test
         if: always()
-        run: cargo test --workspace
+        run: cargo test --workspace --exclude vobes-desktop
 
       - name: build release (sanity)
         if: always()
@@ -92,12 +92,12 @@ jobs:
         with:
           workspaces: "desktop/src-tauri -> target"
 
-      - name: clippy desktop
-        run: cargo clippy -p vobes-desktop --all-targets -- -D warnings
-
       - name: build frontend
         working-directory: desktop
         run: pnpm build
+
+      - name: clippy desktop
+        run: cargo clippy -p vobes-desktop --all-targets -- -D warnings
 
       - name: build desktop (debug)
         run: cargo build -p vobes-desktop
