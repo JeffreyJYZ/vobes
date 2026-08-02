@@ -65,9 +65,16 @@ pub fn snapshots_dir() -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    /// Serializes tests that mutate `VOBES_APP_DIR`. `cargo test` runs
+    /// test threads in parallel, and `std::env` mutation is not
+    /// thread-safe, so the three env-reading tests must not interleave.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn app_dir_name_matches_profile() {
+        let _guard = ENV_LOCK.lock().unwrap();
         let n = app_dir_name();
         if cfg!(debug_assertions) {
             assert!(
@@ -84,7 +91,7 @@ mod tests {
 
     #[test]
     fn state_dir_ends_with_app_name() {
-        // Make this test independent of env-var races with other tests.
+        let _guard = ENV_LOCK.lock().unwrap();
         let prev = std::env::var("VOBES_APP_DIR").ok();
         std::env::remove_var("VOBES_APP_DIR");
         if let Some(d) = state_dir() {
@@ -98,7 +105,7 @@ mod tests {
 
     #[test]
     fn env_override_takes_precedence() {
-        // SAFETY: tests are single-threaded w.r.t. env mutation.
+        let _guard = ENV_LOCK.lock().unwrap();
         let prev = std::env::var("VOBES_APP_DIR").ok();
         std::env::set_var("VOBES_APP_DIR", "vobes-test-override");
         assert_eq!(app_dir_name(), "vobes-test-override");
