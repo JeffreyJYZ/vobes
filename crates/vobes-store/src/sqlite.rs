@@ -92,13 +92,13 @@ impl Store for SqliteStore {
                     created_at, last_opened, last_modified, tags, notes, metadata,
                     git_branch, git_dirty, git_ahead, git_behind,
                     git_last_hash, git_last_msg, git_last_author, git_last_date,
-                    refreshed_at
+                    refreshed_at, pinned
                 ) VALUES (
                     ?1, ?2, ?3, ?4, ?5, ?6,
                     ?7, ?8, ?9, ?10, ?11, ?12,
                     ?13, ?14, ?15, ?16,
                     ?17, ?18, ?19, ?20,
-                    ?21
+                    ?21, ?22
                 )
                 ON CONFLICT(id) DO UPDATE SET
                     name=excluded.name,
@@ -119,7 +119,8 @@ impl Store for SqliteStore {
                     git_last_msg=excluded.git_last_msg,
                     git_last_author=excluded.git_last_author,
                     git_last_date=excluded.git_last_date,
-                    refreshed_at=excluded.refreshed_at",
+                    refreshed_at=excluded.refreshed_at,
+                    pinned=excluded.pinned",
                 params![
                     vobe.id.as_str(),
                     vobe.name,
@@ -142,6 +143,7 @@ impl Store for SqliteStore {
                     git_last_author,
                     git_last_date,
                     Utc::now().to_rfc3339(),
+                    vobe.pinned as i64,
                 ],
             )
             .map_err(|e| vobes_core::Error::storage(format!("upsert vobe: {e}")))?;
@@ -190,10 +192,14 @@ impl Store for SqliteStore {
             }
 
             match sort {
-                Sort::Name => sql.push_str(" ORDER BY name ASC"),
-                Sort::CreatedAt => sql.push_str(" ORDER BY created_at DESC"),
-                Sort::LastOpened => sql.push_str(" ORDER BY last_opened DESC NULLS LAST"),
-                Sort::LastModified => sql.push_str(" ORDER BY last_modified DESC NULLS LAST"),
+                Sort::Name => sql.push_str(" ORDER BY pinned DESC, name ASC"),
+                Sort::CreatedAt => sql.push_str(" ORDER BY pinned DESC, created_at DESC"),
+                Sort::LastOpened => {
+                    sql.push_str(" ORDER BY pinned DESC, last_opened DESC NULLS LAST")
+                }
+                Sort::LastModified => {
+                    sql.push_str(" ORDER BY pinned DESC, last_modified DESC NULLS LAST")
+                }
             }
 
             let mut stmt = conn
@@ -351,13 +357,13 @@ fn upsert_vobe_inline(conn: &Connection, vobe: &Vobe) -> Result<()> {
             created_at, last_opened, last_modified, tags, notes, metadata,
             git_branch, git_dirty, git_ahead, git_behind,
             git_last_hash, git_last_msg, git_last_author, git_last_date,
-            refreshed_at
+            refreshed_at, pinned
         ) VALUES (
             ?1, ?2, ?3, ?4, ?5, ?6,
             ?7, ?8, ?9, ?10, ?11, ?12,
             ?13, ?14, ?15, ?16,
             ?17, ?18, ?19, ?20,
-            ?21
+            ?21, ?22
         )
         ON CONFLICT(id) DO UPDATE SET
             name=excluded.name, path=excluded.path, framework=excluded.framework,
@@ -368,7 +374,7 @@ fn upsert_vobe_inline(conn: &Connection, vobe: &Vobe) -> Result<()> {
             git_ahead=excluded.git_ahead, git_behind=excluded.git_behind,
             git_last_hash=excluded.git_last_hash, git_last_msg=excluded.git_last_msg,
             git_last_author=excluded.git_last_author, git_last_date=excluded.git_last_date,
-            refreshed_at=excluded.refreshed_at",
+            refreshed_at=excluded.refreshed_at, pinned=excluded.pinned",
         params![
             vobe.id.as_str(),
             vobe.name,
@@ -391,6 +397,7 @@ fn upsert_vobe_inline(conn: &Connection, vobe: &Vobe) -> Result<()> {
             git_last_author,
             git_last_date,
             Utc::now().to_rfc3339(),
+            vobe.pinned as i64,
         ],
     )
     .map_err(|e| vobes_core::Error::storage(format!("import upsert: {e}")))?;
@@ -434,6 +441,7 @@ fn row_to_vobe(row: &rusqlite::Row<'_>) -> rusqlite::Result<Vobe> {
     let git_last_msg: Option<String> = row.get("git_last_msg")?;
     let git_last_author: Option<String> = row.get("git_last_author")?;
     let git_last_date: Option<String> = row.get("git_last_date")?;
+    let pinned: i64 = row.get("pinned").unwrap_or(0);
 
     let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
     let metadata: std::collections::HashMap<String, serde_json::Value> =
@@ -486,6 +494,7 @@ fn row_to_vobe(row: &rusqlite::Row<'_>) -> rusqlite::Result<Vobe> {
         last_modified,
         tags,
         notes,
+        pinned: pinned != 0,
         metadata,
     })
 }

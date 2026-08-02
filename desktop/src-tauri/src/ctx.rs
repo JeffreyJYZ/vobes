@@ -10,12 +10,13 @@ use vobes_store::{SqliteStore, Store};
 
 /// Wires together config, store, scanner. Managed by Tauri state.
 pub struct DesktopCtx {
-    /// Loaded config.
-    pub config: Config,
+    /// Active config — wrapped in a Mutex so the settings panel can
+    /// swap it on the fly when the user changes scan settings.
+    pub config: Mutex<Config>,
     /// Storage.
     pub store: Arc<dyn Store>,
-    /// Scanner.
-    pub scanner: Arc<dyn Scanner>,
+    /// Scanner — wrapped in a Mutex for the same reason as `config`.
+    pub scanner: Mutex<Arc<dyn Scanner>>,
     /// DB file (used by export defaults).
     pub db_path: PathBuf,
     /// Single mutex to serialize mutating operations (scan, sync).
@@ -47,11 +48,24 @@ impl DesktopCtx {
         );
 
         Ok(Self {
-            config,
+            config: Mutex::new(config),
             store,
-            scanner,
+            scanner: Mutex::new(scanner),
             db_path,
             scan_lock: Mutex::new(()),
         })
+    }
+
+    /// Snapshot of the current config (cheap clone).
+    pub fn config_snapshot(&self) -> Config {
+        self.config.lock().map(|g| g.clone()).unwrap_or_default()
+    }
+
+    /// Read the current scanner (clones the Arc — cheap).
+    pub fn scanner_snapshot(&self) -> Arc<dyn Scanner> {
+        self.scanner
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_else(|_| Arc::new(DefaultScanner::with_standard_detectors()))
     }
 }

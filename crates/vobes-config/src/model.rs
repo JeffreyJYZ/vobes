@@ -18,6 +18,20 @@ pub struct Config {
     pub git: GitConfig,
     /// Export settings.
     pub export: ExportConfig,
+    /// Desktop-specific preferences (ignored by the CLI).
+    pub desktop: DesktopConfig,
+}
+
+/// Desktop app preferences. The CLI reads/writes this section as
+/// opaque bytes; only the desktop UI surfaces the fields. Lives in
+/// the same `config.toml` as the rest, so dotfile-sync just works.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DesktopConfig {
+    /// Surface an OS notification when a vobe is behind upstream.
+    pub notify_behind: bool,
+    /// Launch Vobes when the user logs in.
+    pub launch_on_login: bool,
 }
 
 /// General workspace metadata.
@@ -98,8 +112,6 @@ impl Default for GitConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ExportConfig {
-    /// Where JSON snapshots are written. `~` expanded.
-    pub path: String,
     /// Export format. Currently `"json"`.
     pub format: String,
 }
@@ -107,7 +119,6 @@ pub struct ExportConfig {
 impl Default for ExportConfig {
     fn default() -> Self {
         Self {
-            path: "~/.vobes/snapshots".to_string(),
             format: "json".to_string(),
         }
     }
@@ -128,6 +139,22 @@ impl Config {
         let s = std::fs::read_to_string(path)
             .map_err(|e| ConfigError::Read(path.to_path_buf(), e.to_string()))?;
         Self::from_toml_str(&s).map_err(|e| ConfigError::Parse(path.to_path_buf(), e.to_string()))
+    }
+
+    /// Serialize to a stable, commented TOML string.
+    pub fn to_toml_string(&self) -> Result<String, ConfigError> {
+        toml::to_string_pretty(self).map_err(|e| ConfigError::Write(e.to_string()))
+    }
+
+    /// Persist the config to disk, creating parent dirs as needed.
+    pub fn save_to(&self, path: &std::path::Path) -> Result<(), ConfigError> {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| ConfigError::Write(format!("mkdir {}: {e}", parent.display())))?;
+        }
+        let body = self.to_toml_string()?;
+        std::fs::write(path, body)
+            .map_err(|e| ConfigError::Write(format!("write {}: {e}", path.display())))
     }
 
     /// Resolve scan roots to absolute paths, expanding `~`.
@@ -160,4 +187,7 @@ pub enum ConfigError {
     /// File could not be parsed.
     #[error("cannot parse config {0}: {1}")]
     Parse(PathBuf, String),
+    /// File could not be written.
+    #[error("cannot write config: {0}")]
+    Write(String),
 }

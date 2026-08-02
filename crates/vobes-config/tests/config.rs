@@ -95,3 +95,73 @@ fn expand_home_handles_corner_cases() {
     assert!(sub.to_string_lossy().ends_with("dev"));
     assert!(!sub.to_string_lossy().contains('~'));
 }
+
+#[test]
+fn desktop_section_defaults_to_off() {
+    let c = Config::from_toml_str("").unwrap();
+    assert!(!c.desktop.notify_behind);
+    assert!(!c.desktop.launch_on_login);
+}
+
+#[test]
+fn desktop_section_parses_when_present() {
+    let toml = r#"
+[desktop]
+notify_behind = true
+launch_on_login = true
+"#;
+    let c = Config::from_toml_str(toml).unwrap();
+    assert!(c.desktop.notify_behind);
+    assert!(c.desktop.launch_on_login);
+}
+
+#[test]
+fn export_section_rejects_stale_path_field() {
+    // We removed `export.path` — deny_unknown_fields should reject
+    // configs that still carry it (e.g. from an older `vbs init`).
+    let toml = r#"
+[export]
+path = "~/.vobes/snapshots"
+format = "json"
+"#;
+    assert!(Config::from_toml_str(toml).is_err());
+}
+
+#[test]
+fn save_to_round_trips() {
+    use vobes_config::Config;
+    let dir = std::env::temp_dir().join("vobes-config-save-tests");
+    std::fs::create_dir_all(&dir).unwrap();
+    let p = dir.join("config.toml");
+    let mut c = Config::default();
+    c.scan.max_depth = 7;
+    c.desktop.notify_behind = true;
+    c.save_to(&p).unwrap();
+    let loaded = Config::load_from(&p).unwrap();
+    assert_eq!(loaded.scan.max_depth, 7);
+    assert!(loaded.desktop.notify_behind);
+    std::fs::remove_file(&p).ok();
+    std::fs::remove_dir(&dir).ok();
+}
+
+#[test]
+fn shipped_example_toml_parses() {
+    // The vobes.example.toml at the repo root must always parse
+    // against the current schema — catches stale fields after a
+    // refactor.
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let example = manifest_dir
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("vobes.example.toml");
+    if !example.exists() {
+        // Workspace layout may differ in some CI setups; skip silently.
+        return;
+    }
+    let s = std::fs::read_to_string(&example).unwrap();
+    Config::from_toml_str(&s).expect("vobes.example.toml must parse");
+}

@@ -84,11 +84,11 @@ pub enum Command {
     },
     /// Export all data as JSON.
     Export {
-        /// Optional custom output path. Defaults to config export path.
+        /// Optional custom output path. Defaults to the snapshots directory.
         #[clap(long)]
         out: Option<String>,
     },
-    /// Create a default `vobes.toml` in the current directory.
+    /// Create a default `config.toml` in the user config directory.
     Init,
 }
 

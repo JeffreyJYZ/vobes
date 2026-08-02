@@ -1,8 +1,11 @@
 # Example Vobes configuration.
-# real config lives at:
-#   macOS/Linux: ~/.config/vobes/config.toml
-#   Windows:     %APPDATA%\vobes\config.toml
-# `vbs init` writes a default there for you.
+# Real config lives at:
+#   macOS:   ~/Library/Application Support/vobes/config.toml
+#   Linux:   ~/.config/vobes/config.toml
+#   Windows: %APPDATA%\vobes\config.toml
+# Debug builds append "-dev" to the directory name so `cargo tauri dev`
+# can't overwrite an installed release. `vbs init` writes a default
+# there for you.
 
 [general]
 name = "My Workspace"
@@ -23,5 +26,8 @@ cache_ttl_seconds = 60
 fetch_upstream = false
 
 [export]
-path = "~/.vobes/snapshots"
 format = "json"
+
+[desktop]
+notify_behind = false
+launch_on_login = false

@@ -21,6 +21,9 @@ dist/
 .vite/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
+# Vite hot-reload temp files
+*.timestamp-*.mjs
+vite.config.ts.timestamp-*
 
 # Secret configs
 **/secrets.toml

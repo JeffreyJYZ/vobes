@@ -1,4 +1,4 @@
-//! `vbs init` — create a default `vobes.toml` in the user config dir.
+//! `vbs init` — create a default `config.toml` in the user config dir.
 
 use std::fs;
 
@@ -27,14 +27,17 @@ cache_ttl_seconds = 60
 fetch_upstream = false
 
 [export]
-path = "~/.vobes/snapshots"
 format = "json"
+
+[desktop]
+notify_behind = false
+launch_on_login = false
 "#;
 
 pub fn run(app: &App) -> Result<()> {
     let Some(path) = &app.config_path else {
         return Err(vobes_core::Error::config(
-            "cannot resolve platform config dir for vobes.toml".to_string(),
+            "cannot resolve platform config dir for config.toml".to_string(),
         ));
     };
     if path.exists() {

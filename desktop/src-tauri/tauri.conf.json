@@ -44,5 +44,11 @@
       }
     }
   },
-  "plugins": {}
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["vobes"]
+      }
+    }
+  }
 }

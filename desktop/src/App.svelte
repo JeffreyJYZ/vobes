@@ -1,332 +1,342 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { invoke } from "@tauri-apps/api/core";
+	import { listen } from "@tauri-apps/api/event";
+	import { onDestroy, onMount } from "svelte";
+	import CommandPalette from "./components/CommandPalette.svelte";
+	import Onboarding from "./components/Onboarding.svelte";
+	import Settings from "./components/Settings.svelte";
+	import ShortcutHelp from "./components/ShortcutHelp.svelte";
+	import Sidebar from "./components/Sidebar.svelte";
+	import Toast from "./components/Toast.svelte";
+	import { modKeyLabel } from "./lib/format";
+	import { isTypingTarget, matchShortcut, shortcuts } from "./lib/keyboard";
+	import {
+		addSavedFilter,
+		applyTheme,
+		config,
+		doScan,
+		effectiveTheme,
+		helpOpen,
+		loadConfig,
+		onboardingDone,
+		openPalette,
+		pushToast,
+		refresh,
+		selectedVobe,
+		themePref,
+		view,
+		vobes,
+	} from "./lib/stores";
+	import Activity from "./views/Activity.svelte";
+	import Dashboard from "./views/Dashboard.svelte";
+	import Projects from "./views/Projects.svelte";
 
-  type Vobe = {
-    id: string;
-    name: string;
-    path: string;
-    language: string | null;
-    framework: string | null;
-    package_manager: string | null;
-    last_modified: string | null;
-    git: {
-      branch: string;
-      dirty: boolean;
-      ahead: number;
-      behind: number;
-    } | null;
-    tags: string[];
-  };
+	let booted = false;
+	let autoRefreshTimer: number | undefined;
+	let fsDebounce: number | undefined;
+	const unlistens: Array<() => void> = [];
 
-  type ActivityEvent = {
-    id: number | null;
-    vobe_id: string;
-    kind: string;
-    timestamp: string;
-    detail: string | null;
-  };
+	// The floating "⌘K Search" hint. Shown until the user either opens
+	// the palette once, or dismisses it explicitly. Stops competing with
+	// the sidebar's "Finish setup" button for the same corner.
+	const PALETTE_HINT_KEY = "vobes:palette-hint-dismissed";
+	let showPaletteHint = false;
+	if (typeof localStorage !== "undefined") {
+		showPaletteHint = localStorage.getItem(PALETTE_HINT_KEY) !== "1";
+	}
+	function dismissPaletteHint() {
+		showPaletteHint = false;
+		if (typeof localStorage !== "undefined") {
+			localStorage.setItem(PALETTE_HINT_KEY, "1");
+		}
+	}
 
-  let view: "dashboard" | "projects" | "activity" = "dashboard";
-  let vobes: Vobe[] = [];
-  let activity: ActivityEvent[] = [];
-  let loading = false;
-  let error: string | null = null;
-  let selected: Vobe | null = null;
-  let confirmReset = false;
+	// React to theme changes any time — initial load, settings save,
+	// or live config swap. Keeps light/dark in sync without restart.
+	$: syncThemeFromConfig($config);
 
-  onMount(async () => {
-    await refresh();
-  });
+	function syncThemeFromConfig(c: typeof $config) {
+		if (!c) return;
+		themePref.set(c.display.theme);
+		const pref = c.display.theme;
+		if (pref === "light" || pref === "dark") {
+			effectiveTheme.set(pref);
+		} else {
+			// auto: read from OS
+			if (typeof window !== "undefined" && window.matchMedia) {
+				const mq = window.matchMedia("(prefers-color-scheme: dark)");
+				effectiveTheme.set(mq.matches ? "dark" : "light");
+			}
+		}
+	}
 
-  async function refresh() {
-    loading = true;
-    error = null;
-    try {
-      [vobes, activity] = await Promise.all([
-        invoke<Vobe[]>("list_vobes"),
-        invoke<ActivityEvent[]>("recent_activity", { limit: 50 }),
-      ]);
-    } catch (e) {
-      error = String(e);
-    } finally {
-      loading = false;
-    }
-  }
+	onMount(async () => {
+		// Apply theme immediately so the boot screen matches the user's pref.
+		applyTheme();
 
-  async function scan() {
-    loading = true;
-    try {
-      await invoke("scan");
-      await refresh();
-    } catch (e) {
-      error = String(e);
-    } finally {
-      loading = false;
-    }
-  }
+		await loadConfig();
+		syncThemeFromConfig($config);
+		await refresh();
+		booted = true;
 
-  async function resetAndRescan() {
-    loading = true;
-    error = null;
-    try {
-      const found = await invoke<number>("reset_and_rescan");
-      await refresh();
-      confirmReset = false;
-      error = `Reset complete — ${found} vobes re-discovered.`;
-    } catch (e) {
-      error = String(e);
-    } finally {
-      loading = false;
-    }
-  }
+		// Auto-refresh on window focus. We deliberately throttle to once per
+		// 15s so a fast tab-switch doesn't hammer the disk.
+		let lastFocusRefresh = 0;
+		window.addEventListener("focus", () => {
+			const now = Date.now();
+			if (now - lastFocusRefresh > 15000) {
+				lastFocusRefresh = now;
+				refresh({ silent: true });
+			}
+		});
 
-  function relative(ts: string | null): string {
-    if (!ts) return "-";
-    const d = new Date(ts);
-    const s = (Date.now() - d.getTime()) / 1000;
-    if (s < 60) return "just now";
-    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-    if (s < 2592000) return `${Math.floor(s / 86400)}d ago`;
-    return `${Math.floor(s / 2592000)}mo ago`;
-  }
+		// Background interval: if the user leaves Vobes open, keep git state
+		// fresh. Disabled in the help / palette overlays so the UI stays calm.
+		autoRefreshTimer = window.setInterval(() => {
+			if (document.hasFocus()) refresh({ silent: true });
+		}, 90000);
 
-  function vobeName(id: string): string {
-    return vobes.find((v) => v.id === id)?.name ?? id.slice(0, 10);
-  }
+		// File-system watcher events from the Rust side. Coalesce a burst of
+		// events (an editor save can produce dozens) into one refresh.
+		unlistens.push(
+			await listen<number>("vobes://fs-changed", () => {
+				if (fsDebounce) clearTimeout(fsDebounce);
+				fsDebounce = window.setTimeout(() => {
+					fsDebounce = undefined;
+					refresh({ silent: true });
+				}, 600);
+			}),
+		);
 
-  function setView(next: "dashboard" | "projects" | "activity") {
-    view = next;
-    selected = null;
-  }
+		// Global shortcut: open the palette.
+		unlistens.push(
+			await listen("vobes://show-palette", () => {
+				openPalette();
+			}),
+		);
+
+		// Deep links: vobes://open/<name>
+		unlistens.push(
+			await listen<string[]>("deep-link://new-url", (e) => {
+				for (const url of e.payload) handleDeepLink(url);
+			}),
+		);
+	});
+
+	onDestroy(() => {
+		if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+		if (fsDebounce) clearTimeout(fsDebounce);
+		for (const u of unlistens) u();
+	});
+
+	function handleDeepLink(url: string) {
+		// Expected shape: vobes://open/<name> or vobes://search?q=foo
+		try {
+			const u = new URL(url);
+			if (u.hostname === "open" || u.pathname.startsWith("/open")) {
+				const segs = u.pathname.split("/").filter(Boolean);
+				const name = segs[0] ? decodeURIComponent(segs[0]) : "";
+				if (name) {
+					const v = $vobes.find(
+						(v) =>
+							v.name === name ||
+							v.name.toLowerCase() === name.toLowerCase(),
+					);
+					if (v) {
+						selectedVobe.set(v);
+						view.set("projects");
+					} else {
+						pushToast({
+							kind: "error",
+							message: `No vobe named "${name}".`,
+						});
+					}
+				}
+			} else if (u.hostname === "search") {
+				const q = u.searchParams.get("q") ?? "";
+				view.set("dashboard");
+				addSavedFilter(`Search: ${q}`, q);
+			} else {
+				pushToast({ kind: "info", message: `Opened ${url}` });
+			}
+		} catch (_err) {
+			pushToast({ kind: "error", message: `Bad deep link: ${url}` });
+		}
+	}
+
+	function onGlobalKey(e: KeyboardEvent) {
+		if (isTypingTarget(e)) return;
+
+		// Palette is handled inside CommandPalette so it can scope its own keys.
+		// The shortcut help toggle, view switching, and refresh live here.
+		if (matchShortcut(shortcuts.find((s) => s.id === "help")!.combo, e)) {
+			e.preventDefault();
+			helpOpen.update((v) => !v);
+			return;
+		}
+		if (
+			matchShortcut(shortcuts.find((s) => s.id === "dashboard")!.combo, e)
+		) {
+			e.preventDefault();
+			view.set("dashboard");
+			return;
+		}
+		if (
+			matchShortcut(shortcuts.find((s) => s.id === "projects")!.combo, e)
+		) {
+			e.preventDefault();
+			// Projects view is detail-only — fall back to dashboard if no
+			// vobe is currently selected.
+			if (!$selectedVobe) {
+				view.set("dashboard");
+			} else {
+				view.set("projects");
+			}
+			return;
+		}
+		if (
+			matchShortcut(shortcuts.find((s) => s.id === "activity")!.combo, e)
+		) {
+			e.preventDefault();
+			view.set("activity");
+			return;
+		}
+		if (
+			matchShortcut(shortcuts.find((s) => s.id === "settings")!.combo, e)
+		) {
+			e.preventDefault();
+			view.set("settings");
+			return;
+		}
+		if (matchShortcut(shortcuts.find((s) => s.id === "scan")!.combo, e)) {
+			e.preventDefault();
+			doScan();
+			return;
+		}
+	}
+
+	$: needsOnboarding = booted && !$onboardingDone && $vobes.length === 0;
 </script>
 
+<svelte:window on:keydown={onGlobalKey} />
+
 <div class="app">
-  <aside class="sidebar">
-    <div class="brand">
-      <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M3 4 L12 20 L21 4"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
-      <h1>Vobes</h1>
-    </div>
-    <button
-      type="button"
-      class="nav-item"
-      class:active={view === "dashboard"}
-      on:click={() => setView("dashboard")}
-    >
-      Dashboard
-    </button>
-    <button
-      type="button"
-      class="nav-item"
-      class:active={view === "projects"}
-      on:click={() => setView("projects")}
-    >
-      Projects
-    </button>
-    <button
-      type="button"
-      class="nav-item"
-      class:active={view === "activity"}
-      on:click={() => setView("activity")}
-    >
-      Activity
-    </button>
-  </aside>
-
-  <main class="main">
-    {#if error}
-      <div class="error" style="color: var(--danger); margin-bottom: 16px;">
-        {error}
-      </div>
-    {/if}
-
-    {#if view === "dashboard"}
-      <h2>Dashboard</h2>
-      <div class="toolbar">
-        <span>{vobes.length} vobes · {activity.length} recent events</span>
-        <button class="primary" on:click={scan} disabled={loading}>
-          {loading ? "Scanning…" : "Scan"}
-        </button>
-      </div>
-      {#if vobes.length === 0}
-        <div class="empty">
-          <strong>No vobes yet</strong>
-          Click <em>Scan</em> to discover projects in your configured roots.
-        </div>
-      {:else}
-        <div class="vobe-grid">
-          {#each vobes as v (v.id)}
-            <button
-              type="button"
-              class="vobe-card"
-              on:click={() => {
-                selected = v;
-                view = "projects";
-              }}
-            >
-              <div class="name">{v.name}</div>
-              <div class="meta">
-                <span>{v.language ?? "-"}</span>
-                <span>·</span>
-                <span>{v.package_manager ?? "-"}</span>
-              </div>
-              <div class="status">
-                {#if v.git}
-                  <span class="badge">{v.git.branch}</span>
-                  {#if v.git.dirty}
-                    <span class="badge dirty">dirty</span>
-                  {/if}
-                  {#if v.git.ahead > 0}
-                    <span class="badge ahead">↑{v.git.ahead}</span>
-                  {/if}
-                  {#if v.git.behind > 0}
-                    <span class="badge behind">↓{v.git.behind}</span>
-                  {/if}
-                {/if}
-                <span class="badge">{relative(v.last_modified)}</span>
-              </div>
-              <div class="path">{v.path}</div>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    {:else if view === "projects"}
-      <div class="view-head">
-        <h2>{selected ? selected.name : "Projects"}</h2>
-        <div class="view-actions">
-          <button class="primary" on:click={scan} disabled={loading}>
-            {loading ? "Scanning…" : "Rescan"}
-          </button>
-          <button
-            class="danger"
-            on:click={() => (confirmReset = true)}
-            disabled={loading}
-          >
-            Reset &amp; Rescan
-          </button>
-        </div>
-      </div>
-      {#if selected}
-        <button on:click={() => (selected = null)}>← Back</button>
-        <div class="detail-card">
-          <div class="detail-grid">
-            <div class="k">Path</div>
-            <div class="v" style="font-family: ui-monospace, Menlo, monospace; font-size: 12px;">{selected.path}</div>
-            <div class="k">Language</div>
-            <div class="v">{selected.language ?? "-"}</div>
-            <div class="k">Framework</div>
-            <div class="v">{selected.framework ?? "-"}</div>
-            <div class="k">Package manager</div>
-            <div class="v">{selected.package_manager ?? "-"}</div>
-            <div class="k">Tags</div>
-            <div class="v">{selected.tags.join(", ") || "-"}</div>
-          </div>
-          {#if selected.git}
-            <div class="section-title">Git</div>
-            <div class="detail-grid">
-              <div class="k">Branch</div>
-              <div class="v">{selected.git.branch}</div>
-              <div class="k">Status</div>
-              <div class="v">
-                {selected.git.dirty ? "dirty" : "clean"}
-                {#if selected.git.ahead > 0} · ↑{selected.git.ahead}{/if}
-                {#if selected.git.behind > 0} · ↓{selected.git.behind}{/if}
-              </div>
-            </div>
-          {/if}
-        </div>
-        <button
-          class="primary"
-          style="margin-top: 16px;"
-          on:click={async () => {
-            if (selected) await invoke("open_vobe", { name: selected.name });
-          }}
-        >
-          Open
-        </button>
-      {:else}
-        <div class="vobe-grid">
-          {#each vobes as v (v.id)}
-            <button type="button" class="vobe-card" on:click={() => (selected = v)}>
-              <div class="name">{v.name}</div>
-              <div class="meta">
-                <span>{v.language ?? "-"}</span>
-                <span>·</span>
-                <span>{v.package_manager ?? "-"}</span>
-              </div>
-              <div class="path">{v.path}</div>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    {:else if view === "activity"}
-      <div class="view-head">
-        <h2>Activity</h2>
-        <button on:click={refresh} disabled={loading}>Refresh</button>
-      </div>
-      <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-          <tr>
-            <th style="text-align:left; padding: 6px;">When</th>
-            <th style="text-align:left; padding: 6px;">Vobe</th>
-            <th style="text-align:left; padding: 6px;">Kind</th>
-            <th style="text-align:left; padding: 6px;">Detail</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each activity as e, i (i)}
-            <tr style="border-top: 1px solid var(--border);">
-              <td style="padding: 6px;">{relative(e.timestamp)}</td>
-              <td style="padding: 6px;">{vobeName(e.vobe_id)}</td>
-              <td style="padding: 6px;">{e.kind}</td>
-              <td style="padding: 6px; color: var(--fg-muted);">{e.detail ?? ""}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    {/if}
-  </main>
-
-  {#if confirmReset}
-    <button
-      class="modal-backdrop"
-      type="button"
-      aria-label="Close dialog"
-      on:click={(e) => {
-        if (e.target === e.currentTarget) confirmReset = false;
-      }}
-    >
-      <div
-        class="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Reset and rescan confirmation"
-        tabindex="-1"
-      >
-        <h3>Reset &amp; Rescan?</h3>
-        <p>
-          This will <strong>delete every vobe and all activity</strong>. There
-          is no undo. The app will then re-scan all roots from scratch.
-        </p>
-        <div class="modal-actions">
-          <button on:click={() => (confirmReset = false)} disabled={loading}>
-            Cancel
-          </button>
-          <button class="danger" on:click={resetAndRescan} disabled={loading}>
-            {loading ? "Working…" : "Delete everything & rescan"}
-          </button>
-        </div>
-      </div>
-    </button>
-  {/if}
+	<Sidebar />
+	<main class="main">
+		{#if !booted}
+			<div class="boot">
+				<div class="spinner"></div>
+				<span>Loading vobes…</span>
+			</div>
+		{:else if needsOnboarding}
+			<Onboarding />
+		{:else if $view === "dashboard"}
+			<Dashboard />
+		{:else if $view === "projects"}
+			<Projects />
+		{:else if $view === "activity"}
+			<Activity />
+		{:else if $view === "settings"}
+			<Settings />
+		{/if}
+	</main>
 </div>
+
+<CommandPalette />
+<ShortcutHelp />
+<Toast />
+
+{#if showPaletteHint}
+	<button
+		class="palette-hint"
+		type="button"
+		on:click={() => {
+			openPalette();
+			dismissPaletteHint();
+		}}
+		title="Command palette"
+	>
+		<span class="kbd">{modKeyLabel()} K</span>
+		<span class="lbl">Search</span>
+		<button
+			class="dismiss"
+			type="button"
+			aria-label="Dismiss hint"
+			on:click|stopPropagation={dismissPaletteHint}>×</button
+		>
+	</button>
+{/if}
+
+<style>
+	.app {
+		display: grid;
+		grid-template-columns: 232px 1fr;
+		height: 100vh;
+		background: var(--bg);
+	}
+	.main {
+		padding: 32px 36px;
+		overflow-y: auto;
+		min-width: 0;
+	}
+	.boot {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		color: var(--fg-muted);
+		padding: 60px 0;
+	}
+	.spinner {
+		width: 16px;
+		height: 16px;
+		border: 2px solid var(--border);
+		border-top-color: var(--accent);
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	.palette-hint {
+		position: fixed;
+		bottom: 18px;
+		left: 250px;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 5px 6px 5px 10px;
+		background: var(--bg-elevated);
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		color: var(--fg-muted);
+		font-size: 12px;
+		cursor: pointer;
+		box-shadow: var(--shadow-sm);
+		z-index: 40;
+	}
+	.palette-hint:hover {
+		color: var(--fg);
+	}
+	.palette-hint .kbd {
+		font-family: ui-monospace, Menlo, monospace;
+		font-size: 11px;
+		background: var(--bg-sunken);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 0 5px;
+	}
+	.palette-hint .dismiss {
+		background: transparent;
+		border: none;
+		color: var(--fg-faint);
+		cursor: pointer;
+		font-size: 14px;
+		line-height: 1;
+		padding: 0 6px;
+		border-radius: 50%;
+	}
+	.palette-hint .dismiss:hover {
+		color: var(--fg);
+	}
+</style>

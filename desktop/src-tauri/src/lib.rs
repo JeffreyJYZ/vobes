@@ -6,25 +6,73 @@
 mod commands;
 mod ctx;
 mod dto;
+mod platform;
+mod watcher;
 
 pub use ctx::DesktopCtx;
 
-use tauri::Manager;
+use std::sync::Arc;
+use tauri::{Emitter, Manager};
+
+use crate::watcher::VobesWatcher;
 
 /// Entry point invoked by `main.rs`.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
             let ctx = match DesktopCtx::load() {
-                Ok(c) => c,
+                Ok(c) => Arc::new(c),
                 Err(e) => {
                     eprintln!("vobes: failed to load app context: {e}");
                     return Err(e.into());
                 }
             };
-            app.manage(std::sync::Arc::new(ctx));
+            app.manage(ctx.clone());
+
+            // Register the deep-link URL scheme at runtime on Linux/Windows
+            // (macOS picks it up from the bundle manifest).
+            #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                if let Err(e) = app.deep_link().register("vobes") {
+                    eprintln!("vobes: deep-link register failed: {e}");
+                }
+            }
+
+            // Start the file watcher (optional — failures are non-fatal).
+            let watcher = VobesWatcher::start(ctx.clone(), app.handle().clone());
+            app.manage(watcher);
+
+            // Register the global shortcut to summon the palette.
+            // We pick Ctrl+Alt+V on all platforms — discoverable, low collision.
+            #[cfg(desktop)]
+            {
+                use tauri_plugin_global_shortcut::{
+                    Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
+                };
+                let app_handle = app.handle().clone();
+                let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
+                if let Err(e) = app.global_shortcut().register(shortcut) {
+                    eprintln!("vobes: global shortcut register failed: {e}");
+                } else {
+                    let handle = app_handle.clone();
+                    app.global_shortcut()
+                        .on_shortcut(shortcut, move |_app, _sc, ev| {
+                            if ev.state() == ShortcutState::Pressed {
+                                handle.emit("vobes://show-palette", ()).ok();
+                            }
+                        })
+                        .ok();
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -39,6 +87,19 @@ pub fn run() {
             commands::remove_vobe,
             commands::open_vobe,
             commands::export_json,
+            commands::get_config,
+            commands::save_config,
+            commands::open_in_terminal,
+            commands::reveal_in_finder,
+            commands::copy_to_clipboard,
+            commands::save_notes,
+            commands::set_pinned,
+            commands::get_pinned,
+            commands::set_tags,
+            commands::read_readme,
+            commands::scrape_todos,
+            commands::context_pack,
+            commands::open_path_external,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

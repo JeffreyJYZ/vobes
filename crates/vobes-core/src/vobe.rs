@@ -50,6 +50,9 @@ pub struct Vobe {
     /// Free-form notes (markdown allowed).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
+    /// Whether the user pinned this vobe (always shown first).
+    #[serde(default)]
+    pub pinned: bool,
     /// Custom, extensible fields. Opaque to Vobes.
     #[serde(default)]
     pub metadata: HashMap<String, Value>,
@@ -72,6 +75,7 @@ impl Vobe {
             last_modified: None,
             tags: Vec::new(),
             notes: None,
+            pinned: false,
             metadata: HashMap::new(),
         }
     }

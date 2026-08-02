@@ -19,6 +19,7 @@ pub struct VobeDto {
     pub last_modified: Option<String>,
     pub tags: Vec<String>,
     pub notes: Option<String>,
+    pub pinned: bool,
     pub git: Option<GitInfoDto>,
 }
 
@@ -65,6 +66,7 @@ impl From<&vobes_core::Vobe> for VobeDto {
             last_modified: v.last_modified.map(|t| t.to_rfc3339()),
             tags: v.tags.clone(),
             notes: v.notes.clone(),
+            pinned: v.pinned,
             git: v.git.as_ref().map(|g| GitInfoDto {
                 branch: g.branch.clone(),
                 dirty: g.dirty,
