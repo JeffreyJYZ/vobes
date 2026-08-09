@@ -1,6 +1,7 @@
 <script lang="ts">
 import {
 	activity,
+	allTags,
 	attentionCount,
 	onboardingDone,
 	removeSavedFilter,
@@ -61,6 +62,23 @@ function applyFilter(q: string) {
       </button>
     {/each}
   </nav>
+
+  {#if $allTags.length > 0}
+    <div class="saved">
+      <div class="saved-head">Workspaces</div>
+      {#each $allTags as t (t)}
+        <button
+          class="tag-btn"
+          type="button"
+          on:click={() => applyFilter(`tag:${t}`)}
+          title={`Scope dashboard to vobes tagged “${t}”`}
+        >
+          <span class="tag-hash">#</span>
+          <span class="lbl">{t}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
 
   {#if $savedFilters.length > 0}
     <div class="saved">
@@ -176,6 +194,20 @@ function applyFilter(q: string) {
     border-radius: 4px;
   }
   .saved-x:hover { color: var(--fg); background: var(--bg-sunken); }
+  .tag-btn {
+    display: flex; align-items: center; gap: 4px;
+    width: 100%;
+    background: transparent; border: none;
+    padding: 5px 8px;
+    color: var(--fg-muted);
+    cursor: pointer;
+    border-radius: 6px;
+    text-align: left;
+    font: inherit;
+    font-size: 13px;
+  }
+  .tag-btn:hover { background: var(--bg-sunken); color: var(--fg); }
+  .tag-btn .tag-hash { color: var(--fg-faint); }
   .footer { margin-top: auto; padding: 8px 4px 0; }
   .setup {
     width: 100%; padding: 9px 12px;

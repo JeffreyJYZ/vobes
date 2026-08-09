@@ -95,7 +95,7 @@ function _focusSearch() {
           bind:this={searchEl}
           bind:value={$searchQuery}
           type="text"
-          placeholder="Search vobes…"
+          placeholder="Search vobes… (tag:rust is:dirty fw:Tauri)"
           aria-label="Search vobes"
         />
       </div>

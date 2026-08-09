@@ -277,19 +277,130 @@ export const attentionCount: Readable<number> = derived(vobes, ($v) => {
 export const visibleVobes: Readable<Vobe[]> = derived(
 	[vobes, searchQuery, sortKey],
 	([$vobes, $q, $sort]) => {
-		const ql = $q.trim().toLowerCase()
-		let arr = $vobes
-		if (ql) {
-			arr = arr.filter(
-				(v) =>
-					v.name.toLowerCase().includes(ql) ||
-					(v.path ?? "").toLowerCase().includes(ql) ||
-					v.tags.some((t) => t.toLowerCase().includes(ql)),
-			)
-		}
+		const parsed = parseQuery($q)
+		let arr = $vobes.filter((v) => vobeMatches(v, parsed))
 		return [...arr].sort((a, b) => sortVobe(a, b, $sort))
 	},
 )
+
+// Parse a search query into structured predicates so the user can
+// scope the dashboard like a workspace: `tag:backend is:dirty rust`
+// matches vobes tagged `backend`, currently dirty, with `rust` in
+// name/path. Unknown `key:val` tokens fall back to substring match
+// against name/path/tags so we never silently drop a literal colon.
+//
+// Recognised tokens:
+//   tag:<name>      vobe has a tag equal to <name> (case-insensitive)
+//   is:dirty        vobe.git.dirty === true
+//   is:clean        vobe.git.dirty === false
+//   is:behind       vobe.git.behind > 0
+//   is:ahead        vobe.git.ahead > 0
+//   is:unpushed     vobe.git.ahead > 0  (alias)
+//   is:pinned       vobe.pinned
+//   lang:<x>        vobe.language === <x> (case-insensitive)
+//   fw:<x>          vobe.framework === <x> (case-insensitive)
+//   pm:<x>          vobe.package_manager === <x>
+// Anything else is a free-text substring across name/path/tags.
+export type ParsedQuery = {
+	tags: string[]
+	predicates: Array<(v: Vobe) => boolean>
+	text: string
+}
+
+export function parseQuery(q: string): ParsedQuery {
+	const tokens = q.trim().split(/\s+/).filter(Boolean)
+	const tags: string[] = []
+	const predicates: Array<(v: Vobe) => boolean> = []
+	const textParts: string[] = []
+	for (const tok of tokens) {
+		const lower = tok.toLowerCase()
+		let consumed = false
+		if (lower.startsWith("tag:")) {
+			const v = lower.slice(4)
+			if (v) tags.push(v)
+			consumed = true
+		} else if (lower.startsWith("lang:")) {
+			const v = lower.slice(5)
+			if (v)
+				predicates.push(
+					(x) => (x.language ?? "").toLowerCase() === v,
+				)
+			consumed = true
+		} else if (lower.startsWith("fw:")) {
+			const v = lower.slice(3)
+			if (v)
+				predicates.push(
+					(x) => (x.framework ?? "").toLowerCase() === v,
+				)
+			consumed = true
+		} else if (lower.startsWith("pm:")) {
+			const v = lower.slice(3)
+			if (v)
+				predicates.push(
+					(x) => (x.package_manager ?? "").toLowerCase() === v,
+				)
+			consumed = true
+		} else {
+			switch (lower) {
+				case "is:dirty":
+					predicates.push((x) => x.git?.dirty === true)
+					consumed = true
+					break
+				case "is:clean":
+					predicates.push((x) => x.git?.dirty === false)
+					consumed = true
+					break
+				case "is:behind":
+					predicates.push((x) => (x.git?.behind ?? 0) > 0)
+					consumed = true
+					break
+				case "is:ahead":
+				case "is:unpushed":
+					predicates.push((x) => (x.git?.ahead ?? 0) > 0)
+					consumed = true
+					break
+				case "is:pinned":
+					predicates.push((x) => x.pinned)
+					consumed = true
+					break
+				default:
+					// leave as text — fallthrough
+					break
+			}
+		}
+		if (!consumed) textParts.push(lower)
+	}
+	return { tags, predicates, text: textParts.join(" ") }
+}
+
+export function vobeMatches(v: Vobe, p: ParsedQuery): boolean {
+	for (const t of p.tags) {
+		if (!v.tags.some((x) => x.toLowerCase() === t)) return false
+	}
+	for (const pred of p.predicates) {
+		if (!pred(v)) return false
+	}
+	if (p.text) {
+		const ql = p.text
+		if (
+			!v.name.toLowerCase().includes(ql) &&
+			!(v.path ?? "").toLowerCase().includes(ql) &&
+			!v.tags.some((t) => t.toLowerCase().includes(ql))
+		) {
+			return false
+		}
+	}
+	return true
+}
+
+// Distinct tag set across all vobes, sorted. Drives the sidebar
+// "Workspaces" section — clicking a tag scopes the dashboard via
+// `applyFilter(\`tag:${name}\`)`, mirroring saved filters.
+export const allTags: Readable<string[]> = derived(vobes, ($vobes) => {
+	const set = new Set<string>()
+	for (const v of $vobes) for (const t of v.tags) if (t) set.add(t)
+	return Array.from(set).sort((a, b) => a.localeCompare(b))
+})
 
 export function sortVobe(a: Vobe, b: Vobe, key: SortKey): number {
 	if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
