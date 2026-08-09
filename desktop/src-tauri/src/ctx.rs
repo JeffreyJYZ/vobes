@@ -27,10 +27,23 @@ impl DesktopCtx {
     /// Load desktop context from default paths.
     pub fn load() -> vobes_core::Result<Self> {
         let cfg_path = vobes_config::config_path();
+        // Degrade to defaults on parse error instead of bubbling a panic
+        // through the Tauri setup hook — a stale/malformed config.toml
+        // (e.g. a field removed in a newer schema) should not brick the
+        // app on launch. The settings panel still surfaces the live file
+        // for the user to fix.
         let config = match &cfg_path {
-            Some(p) => {
-                Config::load_from(p).map_err(|e| vobes_core::Error::config(e.to_string()))?
-            }
+            Some(p) => match Config::load_from(p) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!(
+                        "vobes: config at {} failed to parse ({}); falling back to defaults",
+                        p.display(),
+                        e
+                    );
+                    Config::default()
+                }
+            },
             None => Config::default(),
         };
 
