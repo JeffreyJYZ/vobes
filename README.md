@@ -16,8 +16,8 @@ A **vobe** is one software project managed by Vobes.
 
 Pre-alpha. Core, scanning, git, activity, SQLite store, config, CLI,
 desktop (with command palette, file watcher, deep links, notifications),
-and an MCP server for AI agents. See [`ROADMAP.md`](./ROADMAP.md) for the
-current UX roadmap.
+and an MCP server for AI agents. See the CLI ↔ desktop parity
+table below for what each face supports.
 
 > Dev and release builds use separate data directories
 > (`vobes-dev` vs `vobes`) so `cargo tauri dev` can't overwrite an
@@ -108,6 +108,35 @@ pnpm install
 cargo tauri dev        # hot-reload dev loop (frontend + rust)
 cargo tauri build      # produce installable bundle (in desktop/src-tauri/target/release/bundle)
 ```
+
+## CLI ↔ desktop parity
+
+Both faces talk to the same core. Capabilities should match; gaps are bugs.
+
+| Capability | CLI (`vbs`) | Desktop | Notes |
+|---|---|---|---|
+| Scan roots, discover projects | `scan`, `sync` | `scan`, `sync` commands | identical detector pipeline |
+| List vobes | `list`, `list --json` | dashboard grid | desktop adds fuzzy search + sort UI |
+| Show one vobe | `show <name>`, `show --json` | Projects view | desktop adds README/TODO/notes |
+| Recent activity | `log`, `log --json` | Activity view | both filter by actor |
+| Activity per vobe | `show` (embedded) | Projects activity card | — |
+| Add vobe | `add <path>` | "Add vobe…" | — |
+| Remove vobe | `rm <name>` | "Remove" in Projects view | — |
+| Open in editor | `open <name>` | "Open in editor" | desktop uses shell plugin |
+| Export JSON snapshot | `export` | Settings → Snapshots → Export now | both write `snapshots_dir/vobes-<ts>.json` |
+| Restore snapshot | `import` (planned) | Settings → Snapshots → Restore | CLI import pending — see `Store::import_json` |
+| Pin vobe | — (set via store) | pin button, `set_pinned` | desktop-only surface for now |
+| Tags | — (set via store) | Projects view tag editor | desktop-only surface for now |
+| Notes | — (set via store) | Projects notes editor | desktop-only surface for now |
+| Saved filters | — | sidebar + `save_saved_filter` | desktop-only surface for now |
+| Workspaces (tag scope) | — | sidebar tag click, `tag:X` query | desktop-only surface for now |
+| Agent attribution | `VOBES_ACTOR=agent vbs …` | inherits env | `ActivityEvent::now_env` |
+| MCP tools | — | — | `vobes_list/show/search/recent_activity/context` |
+| Reset + rescan | `reset --yes` | "Reset and rescan" | both call `Store::purge_all` |
+
+Where the CLI is missing a surface that exists in the desktop (saved
+filters, workspaces, pin/tags/notes CLI commands), it's tracked as
+follow-up work, not a permanent split.
 
 ## License
 
