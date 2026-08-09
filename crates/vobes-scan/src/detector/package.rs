@@ -17,6 +17,7 @@ const LOCKFILES: &[(&str, &str)] = &[
     ("bun.lockb", "bun"),
     ("bun.lock", "bun"),
     ("Cargo.lock", "cargo"),
+    ("Cargo.toml", "cargo"),
     ("poetry.lock", "poetry"),
     ("Pipfile.lock", "pipenv"),
     ("uv.lock", "uv"),

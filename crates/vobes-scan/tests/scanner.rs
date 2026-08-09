@@ -43,6 +43,36 @@ fn detects_rust_project_with_cargo_and_framework() {
 }
 
 #[test]
+fn detects_rust_library_without_cargo_lock() {
+    // A Rust library typically does not commit Cargo.lock, so the
+    // package manager detector must recognise Cargo.toml alone.
+    let dir = fixture("rust-lib");
+    write(
+        &dir,
+        "Cargo.toml",
+        "[package]\nname = \"demo-lib\"\nversion = \"0.1\"\n[dependencies]\nserde = \"1\"\n",
+    );
+    write(&dir, "src/lib.rs", "");
+
+    let scanner = DefaultScanner::with_standard_detectors().with_max_depth(2);
+    let report = scanner.scan_report(&dir).unwrap();
+    assert_eq!(report.count(), 1, "got {report:?}");
+
+    let (_, detection) = &report.vobes[0];
+    assert_eq!(
+        detection.package_manager.as_deref(),
+        Some("cargo"),
+        "Cargo.toml alone should signal cargo"
+    );
+    assert_eq!(detection.language.as_deref(), Some("Rust"));
+    assert_eq!(
+        detection.framework.as_deref(),
+        Some("Rust (no framework)")
+    );
+    assert!(!detection.is_repo);
+}
+
+#[test]
 fn detects_node_project_with_pnpm() {
     let dir = fixture("node");
     write(&dir, "pnpm-lock.yaml", "lockfileVersion: 6.0\n");
