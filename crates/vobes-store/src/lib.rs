@@ -10,7 +10,7 @@ mod model;
 mod schema;
 mod sqlite;
 
-pub use model::{ExportSnapshot, Filter, Sort};
+pub use model::{ExportSnapshot, Filter, SavedFilter, Sort};
 pub use sqlite::SqliteStore;
 pub use vobes_core::{ActivityEvent, Result, Vobe, VobeId};
 
@@ -56,6 +56,12 @@ pub trait Store: Send + Sync {
     fn import_json(&self, path: &Path) -> Result<()>;
     /// Delete every vobe and all activity. Dangerous — used by reset.
     fn purge_all(&self) -> Result<()>;
+    /// List all saved filters, newest first.
+    fn list_saved_filters(&self) -> Result<Vec<SavedFilter>>;
+    /// Insert or replace a saved filter by id.
+    fn upsert_saved_filter(&self, filter: &SavedFilter) -> Result<()>;
+    /// Delete a saved filter by id.
+    fn delete_saved_filter(&self, id: &str) -> Result<()>;
 }
 
 /// Blanket impl so `Arc<dyn Store>` / `Box<dyn Store>` can be used as a
@@ -103,5 +109,14 @@ impl<S: Store + ?Sized> Store for std::sync::Arc<S> {
     }
     fn purge_all(&self) -> Result<()> {
         (**self).purge_all()
+    }
+    fn list_saved_filters(&self) -> Result<Vec<SavedFilter>> {
+        (**self).list_saved_filters()
+    }
+    fn upsert_saved_filter(&self, filter: &SavedFilter) -> Result<()> {
+        (**self).upsert_saved_filter(filter)
+    }
+    fn delete_saved_filter(&self, id: &str) -> Result<()> {
+        (**self).delete_saved_filter(id)
     }
 }

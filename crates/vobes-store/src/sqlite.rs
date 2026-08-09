@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use vobes_core::{normalize, ActivityEvent, ActivityKind, Commit, GitInfo, Result, Vobe, VobeId};
 
-use crate::model::{Filter, Sort};
+use crate::model::{Filter, SavedFilter, Sort};
 use crate::schema::migrate;
 use crate::Store;
 
@@ -230,6 +230,57 @@ impl Store for SqliteStore {
                 .map_err(|e| vobes_core::Error::storage(format!("purge activity: {e}")))?;
             conn.execute("DELETE FROM vobes", [])
                 .map_err(|e| vobes_core::Error::storage(format!("purge vobes: {e}")))?;
+            // Saved filters are user-authored views, not derived
+            // state — keep them across a reset so the user does not
+            // have to rebuild their sidebar after a rescan.
+            Ok(())
+        })
+    }
+
+    fn list_saved_filters(&self) -> Result<Vec<SavedFilter>> {
+        self.with_conn(|conn| {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, label, query, created_at FROM saved_filters
+                     ORDER BY created_at DESC",
+                )
+                .map_err(|e| vobes_core::Error::storage(format!("list_filters prepare: {e}")))?;
+            let rows = stmt
+                .query_map([], row_to_saved_filter)
+                .map_err(|e| vobes_core::Error::storage(format!("list_filters query: {e}")))?;
+            let mut out = Vec::new();
+            for r in rows {
+                out.push(r.map_err(|e| vobes_core::Error::storage(format!("row: {e}")))?);
+            }
+            Ok(out)
+        })
+    }
+
+    fn upsert_saved_filter(&self, filter: &SavedFilter) -> Result<()> {
+        self.with_conn(|conn| {
+            conn.execute(
+                "INSERT INTO saved_filters (id, label, query, created_at)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(id) DO UPDATE SET
+                     label = excluded.label,
+                     query = excluded.query,
+                     created_at = excluded.created_at",
+                params![
+                    filter.id,
+                    filter.label,
+                    filter.query,
+                    filter.created_at.to_rfc3339(),
+                ],
+            )
+            .map_err(|e| vobes_core::Error::storage(format!("upsert filter: {e}")))?;
+            Ok(())
+        })
+    }
+
+    fn delete_saved_filter(&self, id: &str) -> Result<()> {
+        self.with_conn(|conn| {
+            conn.execute("DELETE FROM saved_filters WHERE id = ?1", params![id])
+                .map_err(|e| vobes_core::Error::storage(format!("delete filter: {e}")))?;
             Ok(())
         })
     }
@@ -557,6 +608,23 @@ fn row_to_activity(row: &rusqlite::Row<'_>) -> rusqlite::Result<ActivityEvent> {
         timestamp,
         detail,
         actor,
+    })
+}
+
+fn row_to_saved_filter(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedFilter> {
+    let id: String = row.get("id")?;
+    let label: String = row.get("label")?;
+    let query: String = row.get("query")?;
+    let created_at: String = row.get("created_at")?;
+    let created_at = DateTime::parse_from_rfc3339(&created_at)
+        .ok()
+        .map(|d| d.with_timezone(&Utc))
+        .unwrap_or_else(Utc::now);
+    Ok(SavedFilter {
+        id,
+        label,
+        query,
+        created_at,
     })
 }
 

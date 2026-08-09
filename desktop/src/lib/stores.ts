@@ -12,6 +12,7 @@ import type {
 	ConfigDto,
 	Paths,
 	SavedFilter,
+	SavedFilterDto,
 	SortKey,
 	Toast,
 	ToastKind,
@@ -356,42 +357,102 @@ export function applyTheme() {
 effectiveTheme.subscribe(() => applyTheme())
 
 // ---- Saved filters ----
+//
+// Backed by SQLite via the `saved_filters` table (schema v4) so
+// views persist across machines when the user exports their
+// snapshot. On first run after the upgrade, any filters previously
+// stored in localStorage are migrated to the backend and the
+// local copy is cleared.
 
-function loadSavedFilters(): SavedFilter[] {
-	if (typeof localStorage === "undefined") return []
-	try {
-		const raw = localStorage.getItem("vobes:saved-filters")
-		if (!raw) return []
-		const arr = JSON.parse(raw) as SavedFilter[]
-		return Array.isArray(arr) ? arr : []
-	} catch {
-		return []
+export const savedFilters = writable<SavedFilter[]>([])
+export const savedFiltersLoaded = writable(false)
+
+function dtoToSavedFilter(d: SavedFilterDto): SavedFilter {
+	return {
+		id: d.id,
+		label: d.label,
+		query: d.query,
+		createdAt: d.created_at,
 	}
 }
 
-export const savedFilters = writable<SavedFilter[]>(loadSavedFilters())
-
-savedFilters.subscribe((arr) => {
-	if (typeof localStorage !== "undefined") {
-		try {
-			localStorage.setItem("vobes:saved-filters", JSON.stringify(arr))
-		} catch {
-			// quota or privacy mode — ignore
-		}
+function savedFilterToDto(f: SavedFilter): SavedFilterDto {
+	return {
+		id: f.id,
+		label: f.label,
+		query: f.query,
+		created_at: f.createdAt,
 	}
-})
+}
 
-export function addSavedFilter(label: string, query: string): SavedFilter {
+// Load saved filters from the backend, and migrate any localStorage
+// carryover from pre-v0.1.4 builds in the same pass.
+export async function loadSavedFilters(): Promise<void> {
+	if (get(savedFiltersLoaded)) return
+	try {
+		// One-time migration: push any localStorage filters into the
+		// backend, then drop the local copy.
+		let migrated: SavedFilter[] = []
+		try {
+			const raw = localStorage.getItem("vobes:saved-filters")
+			if (raw) {
+				const arr = JSON.parse(raw) as SavedFilter[]
+				if (Array.isArray(arr) && arr.length > 0) migrated = arr
+			}
+		} catch {
+			// ignore
+		}
+		if (migrated.length > 0) {
+			for (const f of migrated) {
+				await api.saveSavedFilter(f.id, f.label, f.query, f.createdAt)
+			}
+			try {
+				localStorage.removeItem("vobes:saved-filters")
+			} catch {
+				// ignore
+			}
+		}
+		const dtos = await api.listSavedFilters()
+		savedFilters.set(dtos.map(dtoToSavedFilter))
+		savedFiltersLoaded.set(true)
+	} catch (e) {
+		// Backend unavailable (e.g. dev-mode race) — leave the store
+		// empty; refresh will retry.
+		console.warn("loadSavedFilters failed:", e)
+	}
+}
+
+export async function addSavedFilter(
+	label: string,
+	query: string,
+): Promise<SavedFilter> {
 	const f: SavedFilter = {
 		id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
 		label: label.trim() || query.trim(),
 		query: query.trim(),
 		createdAt: new Date().toISOString(),
 	}
+	await api.saveSavedFilter(
+		f.id,
+		f.label,
+		f.query,
+		f.createdAt,
+	)
 	savedFilters.update((arr) => [f, ...arr].slice(0, 50))
 	return f
 }
 
-export function removeSavedFilter(id: string) {
+export async function removeSavedFilter(id: string): Promise<void> {
+	try {
+		await api.removeSavedFilter(id)
+	} catch (e) {
+		console.warn("removeSavedFilter backend call failed:", e)
+	}
 	savedFilters.update((arr) => arr.filter((f) => f.id !== id))
+}
+
+// Convenience sync writer for callers that already have the dto in
+// hand and do not need to await the IPC round-trip.
+export function setSavedFilters(arr: SavedFilter[]): void {
+	savedFilters.set(arr)
 }

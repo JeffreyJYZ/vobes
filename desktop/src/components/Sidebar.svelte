@@ -79,7 +79,7 @@ function applyFilter(q: string) {
           <button
             class="saved-x"
             type="button"
-            on:click={() => removeSavedFilter(f.id)}
+            on:click={() => removeSavedFilter(f.id).catch(() => {})}
             aria-label="Remove saved view"
             title="Remove"
           >×</button>

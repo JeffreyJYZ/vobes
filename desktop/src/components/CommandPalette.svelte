@@ -103,8 +103,10 @@ const builtins: Cmd[] = [
 				pushToast({ kind: "info", message: "Type a search first." })
 				return
 			}
-			addSavedFilter(`View: ${q}`, q)
-			pushToast({ kind: "success", message: `Saved view “${q}”.` })
+addSavedFilter(`View: ${q}`, q).then(
+					() => pushToast({ kind: "success", message: `Saved view “${q}”.` }),
+					() => pushToast({ kind: "error", message: "Could not save view." }),
+				)
 		},
 	},
 	{

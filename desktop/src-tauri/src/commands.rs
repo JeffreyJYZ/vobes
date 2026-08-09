@@ -7,7 +7,7 @@ use serde::Serialize;
 use tauri::State;
 
 use vobes_core::{ActivityEvent, ActivityKind, Result};
-use vobes_store::{Filter, Sort};
+use vobes_store::{Filter, SavedFilter, Sort};
 
 use crate::commands::shared::{absolute_normalized, lookup_vobe, vobe_from_detection};
 use crate::ctx::DesktopCtx;
@@ -629,6 +629,65 @@ pub async fn open_path_external(app: tauri::AppHandle, path: String) -> Result<(
         .open_path(p.to_string_lossy().to_string(), None::<String>)
         .map_err(|e| vobes_core::Error::internal(format!("opener: {e}")))?;
     Ok(())
+}
+
+/// Saved-filter DTO — mirrors `vobes_store::SavedFilter` for IPC.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SavedFilterDto {
+    pub id: String,
+    pub label: String,
+    pub query: String,
+    /// RFC3339 timestamp the filter was created.
+    pub created_at: String,
+}
+
+impl From<&vobes_store::SavedFilter> for SavedFilterDto {
+    fn from(f: &vobes_store::SavedFilter) -> Self {
+        Self {
+            id: f.id.clone(),
+            label: f.label.clone(),
+            query: f.query.clone(),
+            created_at: f.created_at.to_rfc3339(),
+        }
+    }
+}
+
+/// List every saved filter, newest first.
+#[tauri::command]
+pub async fn list_saved_filters(state: State<'_, Arc<DesktopCtx>>) -> Result<Vec<SavedFilterDto>> {
+    let filters = state.store.list_saved_filters()?;
+    Ok(filters.iter().map(SavedFilterDto::from).collect())
+}
+
+/// Create or update a saved filter (id is the caller-assigned stable key).
+#[tauri::command]
+pub async fn save_saved_filter(
+    state: State<'_, Arc<DesktopCtx>>,
+    id: String,
+    label: String,
+    query: String,
+    created_at: Option<String>,
+) -> Result<SavedFilterDto> {
+    let created_at = match created_at {
+        Some(s) => chrono::DateTime::parse_from_rfc3339(&s)
+            .map(|d| d.with_timezone(&chrono::Utc))
+            .unwrap_or_else(|_| chrono::Utc::now()),
+        None => chrono::Utc::now(),
+    };
+    let filter = SavedFilter {
+        id,
+        label,
+        query,
+        created_at,
+    };
+    state.store.upsert_saved_filter(&filter)?;
+    Ok(SavedFilterDto::from(&filter))
+}
+
+/// Delete a saved filter by id.
+#[tauri::command]
+pub async fn remove_saved_filter(state: State<'_, Arc<DesktopCtx>>, id: String) -> Result<()> {
+    state.store.delete_saved_filter(&id)
 }
 
 /// Shared helpers reused from CLI logic. Kept private to this module.

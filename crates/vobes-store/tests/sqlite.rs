@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 use vobes_core::{ActivityEvent, ActivityKind, GitInfo, Vobe};
-use vobes_store::{Filter, Sort, SqliteStore, Store};
+use vobes_store::{Filter, SavedFilter, Sort, SqliteStore, Store};
 
 fn sample_vobe(name: &str) -> Vobe {
     let mut v = Vobe::new(name, PathBuf::from(format!("/tmp/{name}")));
@@ -284,4 +284,55 @@ fn path_lookup_is_separator_agnostic() {
         .unwrap()
         .unwrap();
     assert_eq!(by_back.name, "win");
+}
+
+#[test]
+fn saved_filters_round_trip() {
+    // Saved filters should persist in the store and survive
+    // export/import — they live in SQLite, not localStorage.
+    let store = SqliteStore::open_in_memory().unwrap();
+    assert!(store.list_saved_filters().unwrap().is_empty());
+
+    let a = SavedFilter {
+        id: "f1".into(),
+        label: "Dirty Rust".into(),
+        query: "rust dirty".into(),
+        created_at: chrono::Utc::now(),
+    };
+    let b = SavedFilter {
+        id: "f2".into(),
+        label: "Behind upstream".into(),
+        query: "behind".into(),
+        created_at: chrono::Utc::now(),
+    };
+    store.upsert_saved_filter(&a).unwrap();
+    store.upsert_saved_filter(&b).unwrap();
+
+    let listed = store.list_saved_filters().unwrap();
+    assert_eq!(listed.len(), 2);
+    // newest first
+    assert_eq!(listed[0].id, "f2");
+    assert_eq!(listed[1].query, "rust dirty");
+
+    // Upsert on same id replaces.
+    let a2 = SavedFilter {
+        label: "Dirty Rust (updated)".into(),
+        ..a.clone()
+    };
+    store.upsert_saved_filter(&a2).unwrap();
+    let listed = store.list_saved_filters().unwrap();
+    assert_eq!(listed.len(), 2);
+    let got = listed.iter().find(|f| f.id == "f1").unwrap();
+    assert_eq!(got.label, "Dirty Rust (updated)");
+
+    // Delete works.
+    store.delete_saved_filter("f1").unwrap();
+    let listed = store.list_saved_filters().unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id, "f2");
+
+    // purge_all preserves saved filters (user views should not be
+    // wiped by a reset+rescan).
+    store.purge_all().unwrap();
+    assert_eq!(store.list_saved_filters().unwrap().len(), 1);
 }

@@ -126,3 +126,12 @@ export type SavedFilter = {
 	query: string
 	createdAt: string
 }
+
+// Backend-side DTO mirrors `SavedFilterDto` so the frontend can
+// round-trip the same shape it sends to the store.
+export type SavedFilterDto = {
+	id: string
+	label: string
+	query: string
+	created_at: string
+}

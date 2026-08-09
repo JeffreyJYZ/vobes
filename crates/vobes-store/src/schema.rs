@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use vobes_core::Result;
 
 /// Current schema version. Increment when migrations are added.
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 
 /// Initial schema. Creates all tables and indexes for v1.
 pub const SCHEMA_V1: &str = r#"
@@ -63,6 +63,19 @@ ALTER TABLE activity ADD COLUMN actor TEXT NOT NULL DEFAULT 'human';
 CREATE INDEX IF NOT EXISTS idx_activity_actor ON activity(actor, timestamp DESC);
 "#;
 
+/// Migration to v4: create `saved_filters` table so pinned searches
+/// persist with the SQLite store and sync across machines via the
+/// same export/import snapshot that carries vobes + activity.
+pub const MIGRATION_V3_TO_V4: &str = r#"
+CREATE TABLE IF NOT EXISTS saved_filters (
+    id          TEXT PRIMARY KEY,
+    label       TEXT NOT NULL,
+    query       TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_saved_filters_created ON saved_filters(created_at DESC);
+"#;
+
 /// Apply migrations to a fresh or existing connection.
 pub fn migrate(conn: &Connection) -> Result<()> {
     conn.execute_batch(SCHEMA_V1)
@@ -81,6 +94,10 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     if current < 3 {
         conn.execute_batch(MIGRATION_V2_TO_V3)
             .map_err(|e| vobes_core::Error::storage(format!("migrate v3: {e}")))?;
+    }
+    if current < 4 {
+        conn.execute_batch(MIGRATION_V3_TO_V4)
+            .map_err(|e| vobes_core::Error::storage(format!("migrate v4: {e}")))?;
     }
     conn.execute(
         "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",

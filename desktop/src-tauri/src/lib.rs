@@ -100,6 +100,9 @@ pub fn run() {
             commands::scrape_todos,
             commands::context_pack,
             commands::open_path_external,
+            commands::list_saved_filters,
+            commands::save_saved_filter,
+            commands::remove_saved_filter,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

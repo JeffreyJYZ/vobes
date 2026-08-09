@@ -11,6 +11,7 @@ import type {
 	Config,
 	ConfigDto,
 	ContextPack,
+	SavedFilterDto,
 	TodoHit,
 	Vobe,
 } from "./types"
@@ -116,6 +117,28 @@ export async function contextPack(name: string): Promise<ContextPack> {
 
 export async function openPathExternal(path: string): Promise<void> {
 	return invoke<void>("open_path_external", { path })
+}
+
+export async function listSavedFilters(): Promise<SavedFilterDto[]> {
+	return invoke<SavedFilterDto[]>("list_saved_filters")
+}
+
+export async function saveSavedFilter(
+	id: string,
+	label: string,
+	query: string,
+	createdAt?: string,
+): Promise<SavedFilterDto> {
+	return invoke<SavedFilterDto>("save_saved_filter", {
+		id,
+		label,
+		query,
+		createdAt: createdAt ?? null,
+	})
+}
+
+export async function removeSavedFilter(id: string): Promise<void> {
+	return invoke<void>("remove_saved_filter", { id })
 }
 
 export async function openUrlExternal(url: string): Promise<void> {

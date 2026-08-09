@@ -17,6 +17,7 @@
 		effectiveTheme,
 		helpOpen,
 		loadConfig,
+		loadSavedFilters,
 		onboardingDone,
 		openPalette,
 		pushToast,
@@ -76,6 +77,7 @@
 		await loadConfig();
 		syncThemeFromConfig($config);
 		await refresh();
+		await loadSavedFilters();
 		booted = true;
 
 		// Auto-refresh on window focus. We deliberately throttle to once per
@@ -154,7 +156,9 @@
 			} else if (u.hostname === "search") {
 				const q = u.searchParams.get("q") ?? "";
 				view.set("dashboard");
-				addSavedFilter(`Search: ${q}`, q);
+				addSavedFilter(`Search: ${q}`, q).catch(() => {
+					pushToast({ kind: "error", message: `Could not save search “${q}”.` });
+				});
 			} else {
 				pushToast({ kind: "info", message: `Opened ${url}` });
 			}

@@ -92,3 +92,18 @@ impl ExportSnapshot {
         }
     }
 }
+
+/// A pinned search query saved by the user. Persistent counterpart
+/// of the in-frontend `SavedFilter` type — kept in SQLite so it
+/// syncs across machines via JSON export/import.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SavedFilter {
+    /// Stable opaque id (caller-assigned; frontend uses timestamp+rand).
+    pub id: String,
+    /// Human label shown in the sidebar.
+    pub label: String,
+    /// Search query string replayed when the filter is activated.
+    pub query: String,
+    /// When the filter was saved (RFC3339).
+    pub created_at: DateTime<Utc>,
+}

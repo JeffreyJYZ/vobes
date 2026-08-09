@@ -117,14 +117,18 @@ function _focusSearch() {
         {$scanning ? "Scanning…" : "Scan"}
       </button>
       <button
-        on:click={() => {
+        on:click={async () => {
           const q = $searchQuery.trim();
           if (!q) {
             pushToast({ kind: "info", message: "Type a search first." });
             return;
           }
-          addSavedFilter(`View: ${q}`, q);
-          pushToast({ kind: "success", message: `Saved view “${q}”.` });
+          try {
+            await addSavedFilter(`View: ${q}`, q);
+            pushToast({ kind: "success", message: `Saved view “${q}”.` });
+          } catch (_e) {
+            pushToast({ kind: "error", message: "Could not save view." });
+          }
         }}
         disabled={!$searchQuery.trim()}
         title="Pin this search to the sidebar"
