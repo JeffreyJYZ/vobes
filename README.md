@@ -16,9 +16,8 @@ A **vobe** is one software project managed by Vobes.
 
 Pre-alpha. Core, scanning, git, activity, SQLite store, config, CLI,
 desktop (with command palette, file watcher, deep links, notifications),
-and an MCP server for AI agents. See [`design/`](./design/) for the
-original plan and [`ROADMAP.md`](./ROADMAP.md) for the current UX
-roadmap.
+and an MCP server for AI agents. See [`ROADMAP.md`](./ROADMAP.md) for the
+current UX roadmap.
 
 > Dev and release builds use separate data directories
 > (`vobes-dev` vs `vobes`) so `cargo tauri dev` can't overwrite an
@@ -109,10 +108,6 @@ pnpm install
 cargo tauri dev        # hot-reload dev loop (frontend + rust)
 cargo tauri build      # produce installable bundle (in desktop/src-tauri/target/release/bundle)
 ```
-
-## Design
-
-The full product design lives in [`design/`](./design/README.md).
 
 ## License
 
