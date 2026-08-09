@@ -103,6 +103,9 @@ pub fn run() {
             commands::list_saved_filters,
             commands::save_saved_filter,
             commands::remove_saved_filter,
+            commands::list_snapshots,
+            commands::restore_snapshot,
+            commands::delete_snapshot,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

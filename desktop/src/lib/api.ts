@@ -12,6 +12,7 @@ import type {
 	ConfigDto,
 	ContextPack,
 	SavedFilterDto,
+	SnapshotInfo,
 	TodoHit,
 	Vobe,
 } from "./types"
@@ -139,6 +140,18 @@ export async function saveSavedFilter(
 
 export async function removeSavedFilter(id: string): Promise<void> {
 	return invoke<void>("remove_saved_filter", { id })
+}
+
+export async function listSnapshots(): Promise<SnapshotInfo[]> {
+	return invoke<SnapshotInfo[]>("list_snapshots")
+}
+
+export async function restoreSnapshot(path: string): Promise<void> {
+	return invoke<void>("restore_snapshot", { path })
+}
+
+export async function deleteSnapshot(path: string): Promise<void> {
+	return invoke<void>("delete_snapshot", { path })
 }
 
 export async function openUrlExternal(url: string): Promise<void> {

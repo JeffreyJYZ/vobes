@@ -690,6 +690,79 @@ pub async fn remove_saved_filter(state: State<'_, Arc<DesktopCtx>>, id: String) 
     state.store.delete_saved_filter(&id)
 }
 
+/// Snapshot file on disk — name, size, mtime. Listed by the
+/// Settings "Snapshots" card so the user can restore or delete
+/// past exports without dropping to a shell.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SnapshotInfoDto {
+    /// Absolute path to the `.json` snapshot.
+    pub path: String,
+    /// Filename only (e.g. `vobes-2026-08-09-120000.json`).
+    pub name: String,
+    /// File size in bytes.
+    pub size_bytes: u64,
+    /// Last modified time, RFC3339.
+    pub modified_at: String,
+}
+
+/// List every `*.json` snapshot in the platform snapshots dir,
+/// newest first. Returns an empty vec when the dir does not exist
+/// yet (e.g. first launch before any export).
+#[tauri::command]
+pub async fn list_snapshots() -> Result<Vec<SnapshotInfoDto>> {
+    let dir = vobes_config::snapshots_dir().unwrap_or_else(|| PathBuf::from("."));
+    let mut out = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for e in entries.flatten() {
+            let p = e.path();
+            if p.extension().and_then(|s| s.to_str()) != Some("json") {
+                continue;
+            }
+            let meta = match e.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            let modified = meta
+                .modified()
+                .ok()
+                .map(|t| {
+                    let dt: chrono::DateTime<chrono::Utc> = t.into();
+                    dt.to_rfc3339()
+                })
+                .unwrap_or_default();
+            out.push(SnapshotInfoDto {
+                path: p.to_string_lossy().to_string(),
+                name: p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+                size_bytes: meta.len(),
+                modified_at: modified,
+            });
+        }
+    }
+    out.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
+    Ok(out)
+}
+
+/// Restore (import) a snapshot file by absolute path. Replaces the
+/// current store contents with the snapshot's vobes + activity +
+/// saved filters. Frontend should refresh after.
+#[tauri::command]
+pub async fn restore_snapshot(
+    state: State<'_, Arc<DesktopCtx>>,
+    path: String,
+) -> Result<()> {
+    state.store.import_json(Path::new(&path))
+}
+
+/// Delete a snapshot file from the snapshots dir.
+#[tauri::command]
+pub async fn delete_snapshot(path: String) -> Result<()> {
+    std::fs::remove_file(Path::new(&path))
+        .map_err(|e| vobes_core::Error::storage(format!("delete snapshot: {e}")))
+}
+
 /// Shared helpers reused from CLI logic. Kept private to this module.
 pub mod shared {
     use std::path::{Path, PathBuf};

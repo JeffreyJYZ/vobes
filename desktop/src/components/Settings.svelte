@@ -9,19 +9,87 @@ import {
 	errorString,
 	loadConfig,
 	pushToast,
+	refresh,
 	view,
 } from "../lib/stores"
-import type { Config } from "../lib/types"
+import {
+	deleteSnapshot,
+	exportJson,
+	listSnapshots,
+	restoreSnapshot,
+} from "../lib/api"
+import type { Config, SnapshotInfo } from "../lib/types"
 
 let draft: Config | null = null
 let dirty = false
 let saving = false
 let newExclude = ""
 
+let snapshots: SnapshotInfo[] = []
+let snapshotBusy = false
+
 onMount(async () => {
 	if (!$config) await loadConfig()
 	draft = $config ? structuredClone($config) : null
+	await loadSnapshots()
 })
+
+async function loadSnapshots() {
+	try {
+		snapshots = await listSnapshots()
+	} catch (e) {
+		console.warn("listSnapshots failed:", e)
+	}
+}
+
+async function exportNow() {
+	snapshotBusy = true
+	try {
+		const p = await exportJson()
+		pushToast({ kind: "success", message: `Exported snapshot to ${p}.` })
+		await loadSnapshots()
+	} catch (e) {
+		pushToast({ kind: "error", message: `Export failed: ${errorString(e)}` })
+	} finally {
+		snapshotBusy = false
+	}
+}
+
+async function restore(s: SnapshotInfo) {
+	if (
+		!confirm(
+			`Restore ${s.name}? This replaces all current vobes and activity with the snapshot contents.`,
+		)
+	) {
+		return
+	}
+	snapshotBusy = true
+	try {
+		await restoreSnapshot(s.path)
+		await refresh()
+		pushToast({ kind: "success", message: `Restored ${s.name}.` })
+	} catch (e) {
+		pushToast({ kind: "error", message: `Restore failed: ${errorString(e)}` })
+	} finally {
+		snapshotBusy = false
+	}
+}
+
+async function remove(s: SnapshotInfo) {
+	if (!confirm(`Delete ${s.name}? This cannot be undone.`)) return
+	try {
+		await deleteSnapshot(s.path)
+		snapshots = snapshots.filter((x) => x.path !== s.path)
+	} catch (e) {
+		pushToast({ kind: "error", message: `Delete failed: ${errorString(e)}` })
+	}
+}
+
+function fmtBytes(n: number): string {
+	if (n < 1024) return `${n} B`
+	if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+	return `${(n / 1024 / 1024).toFixed(2)} MB`
+}
 
 $: if (draft && $config) {
 	dirty = JSON.stringify(draft) !== JSON.stringify($config)
@@ -232,6 +300,36 @@ function onExcludeKeydown(e: KeyboardEvent) {
     </section>
 
     <section class="block">
+      <div class="snap-head">
+        <h3>Snapshots</h3>
+        <button on:click={exportNow} disabled={snapshotBusy}>
+          {snapshotBusy ? "Working…" : "Export now"}
+        </button>
+      </div>
+      <p class="muted small">
+        Snapshots are full backups of vobes + activity, written as timestamped JSON files in the snapshots directory. Restoring one replaces the current store.
+      </p>
+      {#if snapshots.length === 0}
+        <div class="muted small">No snapshots yet — click “Export now” to create one.</div>
+      {:else}
+        <ul class="snap-list">
+          {#each snapshots as s (s.path)}
+            <li>
+              <div class="snap-meta">
+                <code>{s.name}</code>
+                <span class="muted small">{new Date(s.modified_at).toLocaleString()} · {fmtBytes(s.size_bytes)}</span>
+              </div>
+              <div class="snap-actions">
+                <button on:click={() => restore(s)} disabled={snapshotBusy}>Restore</button>
+                <button class="x" on:click={() => remove(s)} aria-label="Delete snapshot">×</button>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+
+    <section class="block">
       <h3>Desktop</h3>
       <p class="muted small">Desktop only. The CLI ignores these.</p>
       <div class="grid">
@@ -341,6 +439,32 @@ function onExcludeKeydown(e: KeyboardEvent) {
     margin-top: 12px;
   }
   .small { font-size: 12px; }
+  .snap-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .snap-head h3 { margin: 0; }
+  .snap-list {
+    list-style: none; margin: 12px 0 0; padding: 0;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .snap-list li {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .snap-meta { display: flex; flex-direction: column; gap: 2px; }
+  .snap-meta code {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+  }
+  .snap-actions { display: flex; align-items: center; gap: 8px; }
+  .snap-actions button {
+    padding: 4px 10px; font-size: 12.5px;
+  }
   input[type="text"] {
     flex: 1;
     padding: 6px 10px;

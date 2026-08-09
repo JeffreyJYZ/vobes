@@ -135,3 +135,10 @@ export type SavedFilterDto = {
 	query: string
 	created_at: string
 }
+
+export type SnapshotInfo = {
+	path: string
+	name: string
+	size_bytes: number
+	modified_at: string
+}
