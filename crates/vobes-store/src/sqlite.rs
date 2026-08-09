@@ -237,12 +237,13 @@ impl Store for SqliteStore {
     fn record_activity(&self, event: &ActivityEvent) -> Result<()> {
         self.with_conn(|conn| {
             conn.execute(
-                "INSERT INTO activity (vobe_id, kind, timestamp, detail) VALUES (?1, ?2, ?3, ?4)",
+                "INSERT INTO activity (vobe_id, kind, timestamp, detail, actor) VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![
                     event.vobe_id.as_str(),
                     kind_to_str(event.kind),
                     event.timestamp.to_rfc3339(),
                     event.detail,
+                    event.actor,
                 ],
             )
             .map_err(|e| vobes_core::Error::storage(format!("insert activity: {e}")))?;
@@ -254,7 +255,7 @@ impl Store for SqliteStore {
         self.with_conn(|conn| {
             let mut stmt = conn
                 .prepare(
-                    "SELECT id, vobe_id, kind, timestamp, detail FROM activity
+                    "SELECT id, vobe_id, kind, timestamp, detail, actor FROM activity
                      ORDER BY timestamp DESC, id DESC LIMIT ?1",
                 )
                 .map_err(|e| vobes_core::Error::storage(format!("recent prepare: {e}")))?;
@@ -273,7 +274,7 @@ impl Store for SqliteStore {
         self.with_conn(|conn| {
             let mut stmt = conn
                 .prepare(
-                    "SELECT id, vobe_id, kind, timestamp, detail FROM activity
+                    "SELECT id, vobe_id, kind, timestamp, detail, actor FROM activity
                      WHERE vobe_id = ?1
                      ORDER BY timestamp DESC, id DESC LIMIT ?2",
                 )
@@ -281,6 +282,38 @@ impl Store for SqliteStore {
             let rows = stmt
                 .query_map(params![vobe_id.as_str(), limit as i64], row_to_activity)
                 .map_err(|e| vobes_core::Error::storage(format!("vobe_activity query: {e}")))?;
+            let mut out = Vec::new();
+            for r in rows {
+                out.push(r.map_err(|e| vobes_core::Error::storage(format!("row: {e}")))?);
+            }
+            Ok(out)
+        })
+    }
+
+    fn recent_activity_by_actor(
+        &self,
+        actor: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ActivityEvent>> {
+        self.with_conn(|conn| {
+            let sql = if actor.is_some() {
+                "SELECT id, vobe_id, kind, timestamp, detail, actor FROM activity
+                 WHERE actor = ?1
+                 ORDER BY timestamp DESC, id DESC LIMIT ?2"
+            } else {
+                "SELECT id, vobe_id, kind, timestamp, detail, actor FROM activity
+                 ORDER BY timestamp DESC, id DESC LIMIT ?1"
+            };
+            let mut stmt = conn
+                .prepare(sql)
+                .map_err(|e| vobes_core::Error::storage(format!("recent_by_actor prepare: {e}")))?;
+            let rows = if let Some(actor) = actor {
+                stmt.query_map(params![actor, limit as i64], row_to_activity)
+                    .map_err(|e| vobes_core::Error::storage(format!("recent_by_actor query: {e}")))?
+            } else {
+                stmt.query_map(params![limit as i64], row_to_activity)
+                    .map_err(|e| vobes_core::Error::storage(format!("recent_all query: {e}")))?
+            };
             let mut out = Vec::new();
             for r in rows {
                 out.push(r.map_err(|e| vobes_core::Error::storage(format!("row: {e}")))?);
@@ -306,12 +339,13 @@ impl Store for SqliteStore {
             }
             for e in &snap.activity {
                 conn.execute(
-                    "INSERT INTO activity (vobe_id, kind, timestamp, detail) VALUES (?1, ?2, ?3, ?4)",
+                    "INSERT INTO activity (vobe_id, kind, timestamp, detail, actor) VALUES (?1, ?2, ?3, ?4, ?5)",
                     params![
                         e.vobe_id.as_str(),
                         kind_to_str(e.kind),
                         e.timestamp.to_rfc3339(),
-                        e.detail
+                        e.detail,
+                        e.actor,
                     ],
                 )
                 .map_err(|er| vobes_core::Error::storage(format!("import activity: {er}")))?;
@@ -505,6 +539,10 @@ fn row_to_activity(row: &rusqlite::Row<'_>) -> rusqlite::Result<ActivityEvent> {
     let kind: String = row.get("kind")?;
     let timestamp: String = row.get("timestamp")?;
     let detail: Option<String> = row.get("detail")?;
+    // Actor column was added in schema v3; older rows backfill to
+    // "human" via the DEFAULT clause, but be defensive in case a
+    // snapshot is imported against a conn that skipped migration.
+    let actor: String = row.get("actor").unwrap_or_else(|_| "human".to_string());
 
     let kind = kind_from_str(&kind);
     let timestamp = DateTime::parse_from_rfc3339(&timestamp)
@@ -518,6 +556,7 @@ fn row_to_activity(row: &rusqlite::Row<'_>) -> rusqlite::Result<ActivityEvent> {
         kind,
         timestamp,
         detail,
+        actor,
     })
 }
 

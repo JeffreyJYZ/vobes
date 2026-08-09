@@ -67,6 +67,18 @@ pub struct ActivityEvent {
     /// Free-form context (optional).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    /// Who triggered the event: `"human"` (default), an agent name
+    /// (`"agent"`), or any opaque label set via `VOBES_ACTOR`. Used
+    /// by the desktop activity feed to filter "what my agent touched
+    /// today". Defaults to `"human"` for events from older
+    /// snapshots that predate the field.
+    #[serde(default = "default_actor")]
+    pub actor: String,
+}
+
+/// Default actor label used when an event omits the field.
+pub fn default_actor() -> String {
+    "human".to_string()
 }
 
 impl ActivityEvent {
@@ -78,7 +90,16 @@ impl ActivityEvent {
             kind,
             timestamp: Utc::now(),
             detail: None,
+            actor: default_actor(),
         }
+    }
+
+    /// Create a new event with the actor sourced from
+    /// `VOBES_ACTOR`. Use this from CLI/desktop mutation paths so
+    /// agents driving `vbs` are attributed without each call site
+    /// repeating the env lookup.
+    pub fn now_env(vobe_id: VobeId, kind: ActivityKind) -> Self {
+        Self::now(vobe_id, kind).with_actor(actor_from_env())
     }
 
     /// Attach a detail string to the event.
@@ -92,4 +113,24 @@ impl ActivityEvent {
         self.id = Some(id);
         self
     }
+
+    /// Override the actor label on this event. Callers building events
+    /// from CLI/desktop code should pass `actor_from_env()` here so
+    /// the `VOBES_ACTOR` environment variable is honored.
+    pub fn with_actor(mut self, actor: impl Into<String>) -> Self {
+        self.actor = actor.into();
+        self
+    }
+}
+
+/// Resolve the actor label for a CLI/desktop invocation.
+///
+/// Reads the `VOBES_ACTOR` environment variable; falls back to
+/// `"human"` when unset (or set to an empty string). Agents driving
+/// `vbs` via a shell should export this — e.g. `VOBES_ACTOR=agent vbs open api`.
+pub fn actor_from_env() -> String {
+    std::env::var("VOBES_ACTOR")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(default_actor)
 }

@@ -41,7 +41,7 @@ pub fn run(app: &App, yes: bool) -> Result<()> {
             let vobe = vobe_from_detection(&path, &detection)?;
             app.store.upsert_vobe(&vobe)?;
             app.store.record_activity(
-                &ActivityEvent::now(vobe.id.clone(), ActivityKind::Scanned)
+                &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Scanned)
                     .with_detail("vbs reset"),
             )?;
             found += 1;

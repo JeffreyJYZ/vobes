@@ -36,6 +36,20 @@ pub trait Store: Send + Sync {
     fn recent_activity(&self, limit: usize) -> Result<Vec<ActivityEvent>>;
     /// Most recent N events for a vobe (newest first).
     fn vobe_activity(&self, vobe_id: &VobeId, limit: usize) -> Result<Vec<ActivityEvent>>;
+    /// Most recent N events filtered by the `actor` label (newest
+    /// first). Returns all actors when `actor` is `None`. Backs the
+    /// activity-feed "agent vs human" filter in the desktop UI.
+    fn recent_activity_by_actor(
+        &self,
+        actor: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ActivityEvent>> {
+        let mut events = self.recent_activity(limit)?;
+        if let Some(actor) = actor {
+            events.retain(|e| e.actor == actor);
+        }
+        Ok(events)
+    }
     /// Export all data as JSON to the given path.
     fn export_json(&self, path: &Path) -> Result<()>;
     /// Import data from a previous JSON export.
@@ -73,6 +87,13 @@ impl<S: Store + ?Sized> Store for std::sync::Arc<S> {
     }
     fn vobe_activity(&self, vobe_id: &VobeId, limit: usize) -> Result<Vec<ActivityEvent>> {
         (**self).vobe_activity(vobe_id, limit)
+    }
+    fn recent_activity_by_actor(
+        &self,
+        actor: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ActivityEvent>> {
+        (**self).recent_activity_by_actor(actor, limit)
     }
     fn export_json(&self, path: &Path) -> Result<()> {
         (**self).export_json(path)

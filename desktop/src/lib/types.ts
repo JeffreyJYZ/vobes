@@ -37,6 +37,7 @@ export type ActivityEvent = {
 	kind: string
 	timestamp: string
 	detail: string | null
+	actor: string
 }
 
 export type GeneralConfig = {

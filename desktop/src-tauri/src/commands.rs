@@ -28,13 +28,18 @@ pub async fn get_vobe(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result
     Ok(lookup_vobe(&state.store, &name)?.map(|v| VobeDto::from(&v)))
 }
 
-/// Recent activity across all vobes.
+/// Recent activity across all vobes. If `actor` is supplied, only
+/// events whose `actor` label matches exactly are returned — backs
+/// the activity-feed "agent vs human" filter.
 #[tauri::command]
 pub async fn recent_activity(
     state: State<'_, Arc<DesktopCtx>>,
     limit: usize,
+    actor: Option<String>,
 ) -> Result<Vec<ActivityDto>> {
-    let events = state.store.recent_activity(limit)?;
+    let events = state
+        .store
+        .recent_activity_by_actor(actor.as_deref(), limit)?;
     Ok(events.iter().map(ActivityDto::from).collect())
 }
 
@@ -73,7 +78,7 @@ pub async fn scan(state: State<'_, Arc<DesktopCtx>>) -> Result<usize> {
             let vobe = vobe_from_detection(&path, &detection)?;
             state.store.upsert_vobe(&vobe)?;
             state.store.record_activity(
-                &ActivityEvent::now(vobe.id.clone(), ActivityKind::Scanned)
+                &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Scanned)
                     .with_detail("desktop scan"),
             )?;
             found += 1;
@@ -107,7 +112,7 @@ pub async fn reset_and_rescan(state: State<'_, Arc<DesktopCtx>>) -> Result<usize
             let vobe = vobe_from_detection(&path, &detection)?;
             state.store.upsert_vobe(&vobe)?;
             state.store.record_activity(
-                &ActivityEvent::now(vobe.id.clone(), ActivityKind::Scanned)
+                &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Scanned)
                     .with_detail("desktop reset+rescan"),
             )?;
             found += 1;
@@ -150,7 +155,7 @@ pub async fn sync(state: State<'_, Arc<DesktopCtx>>) -> Result<(usize, usize)> {
             } else {
                 state.store.upsert_vobe(&vobe)?;
                 state.store.record_activity(
-                    &ActivityEvent::now(vobe.id.clone(), ActivityKind::Scanned)
+                    &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Scanned)
                         .with_detail("desktop sync"),
                 )?;
                 added += 1;
@@ -185,7 +190,7 @@ pub async fn add_vobe(state: State<'_, Arc<DesktopCtx>>, path: String) -> Result
     let vobe = vobe_from_detection(&abs, &detection)?;
     state.store.upsert_vobe(&vobe)?;
     state.store.record_activity(
-        &ActivityEvent::now(vobe.id.clone(), ActivityKind::Created).with_detail("desktop add"),
+        &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Created).with_detail("desktop add"),
     )?;
     Ok(VobeDto::from(&vobe))
 }
@@ -209,7 +214,7 @@ pub async fn open_vobe(state: State<'_, Arc<DesktopCtx>>, name: String) -> Resul
     vobe.touch_opened();
     state.store.upsert_vobe(&vobe)?;
     state.store.record_activity(
-        &ActivityEvent::now(vobe.id.clone(), ActivityKind::Opened).with_detail("desktop open"),
+        &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Opened).with_detail("desktop open"),
     )?;
     Ok(())
 }
@@ -331,7 +336,7 @@ pub async fn open_in_terminal(state: State<'_, Arc<DesktopCtx>>, name: String) -
     };
     crate::platform::open_terminal(&vobe.path)?;
     state.store.record_activity(
-        &ActivityEvent::now(vobe.id, ActivityKind::Opened).with_detail("terminal"),
+        &ActivityEvent::now_env(vobe.id, ActivityKind::Opened).with_detail("terminal"),
     )?;
     Ok(())
 }

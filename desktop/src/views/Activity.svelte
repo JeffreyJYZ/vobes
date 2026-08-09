@@ -1,12 +1,28 @@
 <script lang="ts">
 import { relativeTime } from "../lib/format"
 import { activity, kindLabel, refresh, scanning, vobes } from "../lib/stores"
+import { recentActivity } from "../lib/api"
 import type { ActivityEvent, Vobe } from "../lib/types"
 
 let kindFilter: string = "all"
 let vobeFilter: string = "all"
+let actorFilter: string = "all"
 
-$: filtered = filterEvents($activity, $vobes, kindFilter, vobeFilter)
+// Re-fetch from the backend whenever the actor filter changes so
+// the "agent vs human" view is exact, not a client-side subset of
+// the default 50-event page already loaded.
+async function applyActorFilter(actor: string) {
+	actorFilter = actor
+	const a = actor === "all" ? undefined : actor
+	try {
+		const events = await recentActivity(200, a)
+		activity.set(events)
+	} catch {
+		// keep existing events — backend may be busy
+	}
+}
+
+$: filtered = filterEvents($activity, $vobes, kindFilter, vobeFilter, actorFilter)
 $: grouped = groupByDay(filtered)
 
 function filterEvents(
@@ -14,10 +30,12 @@ function filterEvents(
 	_vobesList: Vobe[],
 	kind: string,
 	vobeId: string,
+	actor: string,
 ): ActivityEvent[] {
 	return all.filter((e) => {
 		if (kind !== "all" && e.kind !== kind) return false
 		if (vobeId !== "all" && e.vobe_id !== vobeId) return false
+		if (actor !== "all" && e.actor !== actor) return false
 		return true
 	})
 }
@@ -45,6 +63,7 @@ function vobeName(id: string, all: Vobe[]): string {
 }
 
 $: kinds = Array.from(new Set($activity.map((e) => e.kind))).sort()
+$: actors = Array.from(new Set($activity.map((e) => e.actor))).sort()
 </script>
 
 <div class="activity">
@@ -74,6 +93,15 @@ $: kinds = Array.from(new Set($activity.map((e) => e.kind))).sort()
         {/each}
       </select>
     </label>
+    <label>
+      <span>Actor</span>
+      <select value={actorFilter} on:change={(e) => applyActorFilter(e.currentTarget.value)}>
+        <option value="all">All actors</option>
+        {#each actors as a (a)}
+          <option value={a}>{a}</option>
+        {/each}
+      </select>
+    </label>
     <span class="count">{$activity.length} events</span>
   </div>
 
@@ -98,6 +126,9 @@ $: kinds = Array.from(new Set($activity.map((e) => e.kind))).sort()
                 <span class="vobe">{vobeName(e.vobe_id, $vobes)}</span>
                 {#if e.detail}
                   <span class="detail">— {e.detail}</span>
+                {/if}
+                {#if e.actor && e.actor !== "human"}
+                  <span class="actor-badge" title={`Recorded by ${e.actor}`}>{e.actor}</span>
                 {/if}
               </span>
             </li>
@@ -168,6 +199,15 @@ $: kinds = Array.from(new Set($activity.map((e) => e.kind))).sort()
   .verb { color: var(--accent); font-weight: 600; }
   .vobe { font-weight: 600; }
   .detail { color: var(--fg-muted); }
+  .actor-badge {
+    font-size: 10.5px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--fg-muted);
+    text-transform: lowercase;
+  }
   .empty {
     color: var(--fg-muted); text-align: center;
     padding: 64px 24px;

@@ -23,8 +23,14 @@ export async function getVobe(name: string): Promise<Vobe | null> {
 	return invoke<Vobe | null>("get_vobe", { name })
 }
 
-export async function recentActivity(limit: number): Promise<ActivityEvent[]> {
-	return invoke<ActivityEvent[]>("recent_activity", { limit })
+export async function recentActivity(
+	limit: number,
+	actor?: string,
+): Promise<ActivityEvent[]> {
+	return invoke<ActivityEvent[]>("recent_activity", {
+		limit,
+		actor: actor ?? null,
+	})
 }
 
 export async function vobeActivity(

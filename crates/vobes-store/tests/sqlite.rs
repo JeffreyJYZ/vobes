@@ -170,6 +170,56 @@ fn activity_persists_and_queries() {
 }
 
 #[test]
+fn activity_actor_filter() {
+    // Events recorded with different actors should be filterable
+    // via `recent_activity_by_actor` — backs the desktop "agent vs
+    // human" feed.
+    let store = SqliteStore::open_in_memory().unwrap();
+    let a = sample_vobe("a");
+    let a_id = a.id.clone();
+    store.upsert_vobe(&a).unwrap();
+
+    store
+        .record_activity(
+            &ActivityEvent::now(a_id.clone(), ActivityKind::Created)
+                .with_actor("human"),
+        )
+        .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    store
+        .record_activity(
+            &ActivityEvent::now(a_id.clone(), ActivityKind::Opened)
+                .with_actor("agent"),
+        )
+        .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    store
+        .record_activity(
+            &ActivityEvent::now(a_id, ActivityKind::Scanned).with_actor("agent"),
+        )
+        .unwrap();
+
+    let all = store.recent_activity_by_actor(None, 10).unwrap();
+    assert_eq!(all.len(), 3);
+
+    let humans = store.recent_activity_by_actor(Some("human"), 10).unwrap();
+    assert_eq!(humans.len(), 1);
+    assert_eq!(humans[0].kind, ActivityKind::Created);
+    assert_eq!(humans[0].actor, "human");
+
+    let agents = store.recent_activity_by_actor(Some("agent"), 10).unwrap();
+    assert_eq!(agents.len(), 2);
+    assert!(agents.iter().all(|e| e.actor == "agent"));
+    // newest first
+    assert_eq!(agents[0].kind, ActivityKind::Scanned);
+    assert_eq!(agents[1].kind, ActivityKind::Opened);
+
+    // Default actor on plain `ActivityEvent::now` is "human".
+    let default = ActivityEvent::now(vobes_core::VobeId::from_string("x"), ActivityKind::Opened);
+    assert_eq!(default.actor, "human");
+}
+
+#[test]
 fn export_and_import_round_trip() {
     let dir = std::env::temp_dir().join(format!("vobes-store-export-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);

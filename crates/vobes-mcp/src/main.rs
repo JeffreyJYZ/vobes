@@ -123,11 +123,12 @@ fn tools() -> Vec<Value> {
         ),
         tool(
             "vobes_recent_activity",
-            "Return the most recent activity events across all Vobes.",
+            "Return the most recent activity events across all Vobes. Optionally filter by actor (e.g. \"human\", \"agent\", or any custom VOBES_ACTOR label).",
             json!({
                 "type": "object",
                 "properties": {
-                    "limit": { "type": "integer", "description": "Max events (default 20)", "default": 20 }
+                    "limit": { "type": "integer", "description": "Max events (default 20)", "default": 20 },
+                    "actor": { "type": "string", "description": "Only events whose actor label matches exactly. Omit for all actors." }
                 }
             }),
         ),
@@ -232,9 +233,10 @@ fn tool_recent(app: &App, args: &Value) -> Result<String, String> {
         .and_then(|l| l.as_u64())
         .map(|l| l as usize)
         .unwrap_or(20);
+    let actor = args.get("actor").and_then(|a| a.as_str());
     let events: Vec<ActivityEvent> = app
         .store
-        .recent_activity(limit)
+        .recent_activity_by_actor(actor, limit)
         .map_err(|e| e.to_string())?;
     serialize(&events)
 }

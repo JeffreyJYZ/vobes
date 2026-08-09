@@ -33,7 +33,7 @@ pub fn run(app: &App) -> Result<()> {
             } else {
                 app.store.upsert_vobe(&vobe)?;
                 app.store.record_activity(
-                    &ActivityEvent::now(vobe.id.clone(), ActivityKind::Scanned)
+                    &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Scanned)
                         .with_detail("vbs sync"),
                 )?;
                 added += 1;

@@ -12,7 +12,7 @@ pub fn run(app: &App, name: &str) -> Result<()> {
     vobe.touch_opened();
     app.store.upsert_vobe(&vobe)?;
     app.store.record_activity(
-        &ActivityEvent::now(vobe.id.clone(), ActivityKind::Opened).with_detail("vbs open"),
+        &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Opened).with_detail("vbs open"),
     )?;
 
     // Launch editor if configured. Best-effort.

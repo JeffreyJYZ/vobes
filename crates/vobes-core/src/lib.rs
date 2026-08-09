@@ -12,7 +12,7 @@ pub mod git;
 pub mod path;
 pub mod vobe;
 
-pub use activity::{ActivityEvent, ActivityKind};
+pub use activity::{actor_from_env, default_actor, ActivityEvent, ActivityKind};
 pub use error::{Error, ParseIdError, Result, VobeId};
 pub use git::{Commit, GitInfo};
 pub use path::{normalize, normalize_str};

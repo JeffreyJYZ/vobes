@@ -34,7 +34,7 @@ pub fn run(app: &App, path: &str) -> Result<()> {
     let vobe = vobe_from_detection(&abs, &detection)?;
     app.store.upsert_vobe(&vobe)?;
     app.store.record_activity(
-        &ActivityEvent::now(vobe.id.clone(), ActivityKind::Created).with_detail("vbs add"),
+        &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Created).with_detail("vbs add"),
     )?;
     println!("added: {} -> {}", vobe.name, vobe.path.display());
     Ok(())

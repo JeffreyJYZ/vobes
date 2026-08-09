@@ -44,7 +44,7 @@ pub fn run(app: &App) -> Result<()> {
             app.store.upsert_vobe(&vobe)?;
             new_ids.insert(vobe.id.as_str().to_string());
             app.store.record_activity(
-                &ActivityEvent::now(vobe.id.clone(), ActivityKind::Scanned).with_detail("vbs scan"),
+                &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Scanned).with_detail("vbs scan"),
             )?;
             vobe.touch_modified();
             found += 1;

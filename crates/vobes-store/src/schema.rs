@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use vobes_core::Result;
 
 /// Current schema version. Increment when migrations are added.
-pub const SCHEMA_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 3;
 
 /// Initial schema. Creates all tables and indexes for v1.
 pub const SCHEMA_V1: &str = r#"
@@ -55,6 +55,14 @@ ALTER TABLE vobes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_vobes_pinned ON vobes(pinned DESC, last_modified DESC);
 "#;
 
+/// Migration to v3: add `actor` column to activity. Older rows
+/// backfill to `"human"` — matches the `ActivityEvent::default`
+/// semantics used by the core model.
+pub const MIGRATION_V2_TO_V3: &str = r#"
+ALTER TABLE activity ADD COLUMN actor TEXT NOT NULL DEFAULT 'human';
+CREATE INDEX IF NOT EXISTS idx_activity_actor ON activity(actor, timestamp DESC);
+"#;
+
 /// Apply migrations to a fresh or existing connection.
 pub fn migrate(conn: &Connection) -> Result<()> {
     conn.execute_batch(SCHEMA_V1)
@@ -69,6 +77,10 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     if current < 2 {
         conn.execute_batch(MIGRATION_V1_TO_V2)
             .map_err(|e| vobes_core::Error::storage(format!("migrate v2: {e}")))?;
+    }
+    if current < 3 {
+        conn.execute_batch(MIGRATION_V2_TO_V3)
+            .map_err(|e| vobes_core::Error::storage(format!("migrate v3: {e}")))?;
     }
     conn.execute(
         "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",

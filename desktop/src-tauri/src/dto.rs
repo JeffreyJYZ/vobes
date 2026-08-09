@@ -50,6 +50,9 @@ pub struct ActivityDto {
     pub kind: String,
     pub timestamp: String,
     pub detail: Option<String>,
+    /// Who triggered the event: `"human"` (default), an agent name
+    /// (`"agent"`), or any opaque label set via `VOBES_ACTOR`.
+    pub actor: String,
 }
 
 impl From<&vobes_core::Vobe> for VobeDto {
@@ -91,6 +94,7 @@ impl From<&vobes_core::ActivityEvent> for ActivityDto {
             kind: format!("{:?}", e.kind),
             timestamp: e.timestamp.to_rfc3339(),
             detail: e.detail.clone(),
+            actor: e.actor.clone(),
         }
     }
 }
