@@ -242,7 +242,7 @@ impl Store for SqliteStore {
             let mut stmt = conn
                 .prepare(
                     "SELECT id, label, query, created_at FROM saved_filters
-                     ORDER BY created_at DESC",
+                     ORDER BY created_at DESC, id DESC",
                 )
                 .map_err(|e| vobes_core::Error::storage(format!("list_filters prepare: {e}")))?;
             let rows = stmt

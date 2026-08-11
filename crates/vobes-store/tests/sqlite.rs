@@ -289,17 +289,18 @@ fn saved_filters_round_trip() {
     let store = SqliteStore::open_in_memory().unwrap();
     assert!(store.list_saved_filters().unwrap().is_empty());
 
+    let base = chrono::Utc::now();
     let a = SavedFilter {
         id: "f1".into(),
         label: "Dirty Rust".into(),
         query: "rust dirty".into(),
-        created_at: chrono::Utc::now(),
+        created_at: base,
     };
     let b = SavedFilter {
         id: "f2".into(),
         label: "Behind upstream".into(),
         query: "behind".into(),
-        created_at: chrono::Utc::now(),
+        created_at: base + chrono::Duration::seconds(1),
     };
     store.upsert_saved_filter(&a).unwrap();
     store.upsert_saved_filter(&b).unwrap();
