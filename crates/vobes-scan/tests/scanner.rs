@@ -65,10 +65,7 @@ fn detects_rust_library_without_cargo_lock() {
         "Cargo.toml alone should signal cargo"
     );
     assert_eq!(detection.language.as_deref(), Some("Rust"));
-    assert_eq!(
-        detection.framework.as_deref(),
-        Some("Rust (no framework)")
-    );
+    assert_eq!(detection.framework.as_deref(), Some("Rust (no framework)"));
     assert!(!detection.is_repo);
 }
 

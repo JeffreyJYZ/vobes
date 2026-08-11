@@ -360,7 +360,9 @@ impl Store for SqliteStore {
                 .map_err(|e| vobes_core::Error::storage(format!("recent_by_actor prepare: {e}")))?;
             let rows = if let Some(actor) = actor {
                 stmt.query_map(params![actor, limit as i64], row_to_activity)
-                    .map_err(|e| vobes_core::Error::storage(format!("recent_by_actor query: {e}")))?
+                    .map_err(|e| {
+                        vobes_core::Error::storage(format!("recent_by_actor query: {e}"))
+                    })?
             } else {
                 stmt.query_map(params![limit as i64], row_to_activity)
                     .map_err(|e| vobes_core::Error::storage(format!("recent_all query: {e}")))?

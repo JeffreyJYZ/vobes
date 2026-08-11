@@ -749,10 +749,7 @@ pub async fn list_snapshots() -> Result<Vec<SnapshotInfoDto>> {
 /// current store contents with the snapshot's vobes + activity +
 /// saved filters. Frontend should refresh after.
 #[tauri::command]
-pub async fn restore_snapshot(
-    state: State<'_, Arc<DesktopCtx>>,
-    path: String,
-) -> Result<()> {
+pub async fn restore_snapshot(state: State<'_, Arc<DesktopCtx>>, path: String) -> Result<()> {
     state.store.import_json(Path::new(&path))
 }
 

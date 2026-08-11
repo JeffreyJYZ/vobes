@@ -181,22 +181,18 @@ fn activity_actor_filter() {
 
     store
         .record_activity(
-            &ActivityEvent::now(a_id.clone(), ActivityKind::Created)
-                .with_actor("human"),
+            &ActivityEvent::now(a_id.clone(), ActivityKind::Created).with_actor("human"),
         )
         .unwrap();
     std::thread::sleep(std::time::Duration::from_millis(10));
     store
         .record_activity(
-            &ActivityEvent::now(a_id.clone(), ActivityKind::Opened)
-                .with_actor("agent"),
+            &ActivityEvent::now(a_id.clone(), ActivityKind::Opened).with_actor("agent"),
         )
         .unwrap();
     std::thread::sleep(std::time::Duration::from_millis(10));
     store
-        .record_activity(
-            &ActivityEvent::now(a_id, ActivityKind::Scanned).with_actor("agent"),
-        )
+        .record_activity(&ActivityEvent::now(a_id, ActivityKind::Scanned).with_actor("agent"))
         .unwrap();
 
     let all = store.recent_activity_by_actor(None, 10).unwrap();
