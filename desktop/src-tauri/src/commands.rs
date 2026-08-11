@@ -328,19 +328,6 @@ pub async fn save_config(
     })
 }
 
-/// Spawn a new terminal at the vobe's directory.
-#[tauri::command]
-pub async fn open_in_terminal(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result<()> {
-    let Some(vobe) = lookup_vobe(&state.store, &name)? else {
-        return Err(vobes_core::Error::not_found(name));
-    };
-    crate::platform::open_terminal(&vobe.path)?;
-    state.store.record_activity(
-        &ActivityEvent::now_env(vobe.id, ActivityKind::Opened).with_detail("terminal"),
-    )?;
-    Ok(())
-}
-
 /// Reveal the vobe's path in the OS file manager.
 #[tauri::command]
 pub async fn reveal_in_finder(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result<()> {
@@ -758,6 +745,100 @@ pub async fn restore_snapshot(state: State<'_, Arc<DesktopCtx>>, path: String) -
 pub async fn delete_snapshot(path: String) -> Result<()> {
     std::fs::remove_file(Path::new(&path))
         .map_err(|e| vobes_core::Error::storage(format!("delete snapshot: {e}")))
+}
+
+/// Terminal app descriptor surfaced to the frontend for the
+/// "Open in terminal" selector on the Projects detail view.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TerminalAppDto {
+    pub id: String,
+    pub label: String,
+    pub is_default: bool,
+}
+
+impl From<&crate::platform::TerminalApp> for TerminalAppDto {
+    fn from(t: &crate::platform::TerminalApp) -> Self {
+        Self {
+            id: t.id.clone(),
+            label: t.label.clone(),
+            is_default: t.is_default,
+        }
+    }
+}
+
+/// Editor app descriptor surfaced to the frontend for the
+/// "Open in editor" selector on the Projects detail view.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EditorAppDto {
+    pub id: String,
+    pub label: String,
+    pub is_default: bool,
+}
+
+impl From<&crate::platform::EditorApp> for EditorAppDto {
+    fn from(e: &crate::platform::EditorApp) -> Self {
+        Self {
+            id: e.id.clone(),
+            label: e.label.clone(),
+            is_default: e.is_default,
+        }
+    }
+}
+
+/// List terminal emulators installed on this machine.
+#[tauri::command]
+pub async fn list_terminals() -> Result<Vec<TerminalAppDto>> {
+    Ok(crate::platform::list_terminals()
+        .iter()
+        .map(TerminalAppDto::from)
+        .collect())
+}
+
+/// List editors installed on this machine.
+#[tauri::command]
+pub async fn list_editors() -> Result<Vec<EditorAppDto>> {
+    Ok(crate::platform::list_editors()
+        .iter()
+        .map(EditorAppDto::from)
+        .collect())
+}
+
+/// Spawn the named terminal at the vobe's path. If `app` is `None`,
+/// falls back to the platform default.
+#[tauri::command]
+pub async fn open_in_terminal(
+    state: State<'_, Arc<DesktopCtx>>,
+    name: String,
+    app: Option<String>,
+) -> Result<()> {
+    let Some(vobe) = lookup_vobe(&state.store, &name)? else {
+        return Err(vobes_core::Error::not_found(name));
+    };
+    crate::platform::open_terminal_with(&vobe.path, app.as_deref())?;
+    state.store.record_activity(
+        &ActivityEvent::now_env(vobe.id, ActivityKind::Opened).with_detail("terminal"),
+    )?;
+    Ok(())
+}
+
+/// Open the vobe's directory in the selected editor. `app` is an id
+/// returned by `list_editors`; `None` falls back to the platform
+/// default. The old frontend-side shell-plugin path is deprecated —
+/// all editor launches funnel here so actor attribution works.
+#[tauri::command]
+pub async fn open_in_editor(
+    state: State<'_, Arc<DesktopCtx>>,
+    name: String,
+    app: Option<String>,
+) -> Result<()> {
+    let Some(vobe) = lookup_vobe(&state.store, &name)? else {
+        return Err(vobes_core::Error::not_found(name));
+    };
+    crate::platform::open_editor(&vobe.path, app.as_deref())?;
+    state.store.record_activity(
+        &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Opened).with_detail("editor"),
+    )?;
+    Ok(())
 }
 
 /// Shared helpers reused from CLI logic. Kept private to this module.

@@ -11,8 +11,10 @@ import type {
 	Config,
 	ConfigDto,
 	ContextPack,
+	EditorApp,
 	SavedFilterDto,
 	SnapshotInfo,
+	TerminalApp,
 	TodoHit,
 	Vobe,
 } from "./types"
@@ -79,6 +81,22 @@ export async function saveConfig(config: Config): Promise<ConfigDto> {
 
 export async function openInTerminal(name: string): Promise<void> {
 	return invoke<void>("open_in_terminal", { name })
+}
+
+export async function openInTerminalWith(name: string, app: string): Promise<void> {
+	return invoke<void>("open_in_terminal", { name, app })
+}
+
+export async function listTerminals(): Promise<TerminalApp[]> {
+	return invoke<TerminalApp[]>("list_terminals")
+}
+
+export async function listEditors(): Promise<EditorApp[]> {
+	return invoke<EditorApp[]>("list_editors")
+}
+
+export async function openInEditor(name: string, app?: string): Promise<void> {
+	return invoke<void>("open_in_editor", { name, app: app ?? null })
 }
 
 export async function revealInFinder(name: string): Promise<void> {
@@ -156,29 +174,6 @@ export async function deleteSnapshot(path: string): Promise<void> {
 
 export async function openUrlExternal(url: string): Promise<void> {
 	return invoke<void>("open_path_external", { path: url })
-}
-
-// Shell plugin wrapper. We deliberately do not pass arbitrary args — only
-// the editor command is opened, on the vobe's path.
-export async function openInEditor(
-	_name: string,
-	path: string,
-	editorCmd?: string,
-): Promise<void> {
-	const cmd = editorCmd?.trim() || defaultEditor()
-	await runShell(cmd, [path])
-}
-
-function defaultEditor(): string {
-	if (typeof navigator !== "undefined" && /Mac/i.test(navigator.platform)) {
-		return "code" // fall back; let `code` PATH-resolve, or surface failure as a toast
-	}
-	return "code"
-}
-
-async function runShell(program: string, args: string[]): Promise<void> {
-	const c = await ShellCommand.create(program, args)
-	await c.execute()
 }
 
 // Copy text to the OS clipboard. Uses the Tauri-injected `__TAURI__` writeText

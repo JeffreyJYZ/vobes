@@ -150,6 +150,26 @@ export async function doSync(): Promise<void> {
 	}
 }
 
+export async function doReset(): Promise<void> {
+	// Destructive: purge every vobe + all activity, then re-scan
+	// from scratch. The UI confirms before calling — the backend
+	// does not prompt.
+	scanning.set(true)
+	try {
+		const found = await api.resetAndRescan()
+		pushToast({
+			kind: "success",
+			message: `Reset complete: ${found} vobe${found === 1 ? "" : "s"} re-discovered.`,
+		})
+		await refresh({ silent: true })
+		lastRefreshed.set(Date.now())
+	} catch (e) {
+		pushToast({ kind: "error", message: errorString(e) })
+	} finally {
+		scanning.set(false)
+	}
+}
+
 // ---- View + UI state ----
 
 export const view = writable<ViewId>("dashboard")
@@ -243,11 +263,15 @@ export function pushToast(input: {
 	ttl?: number
 }): number {
 	const id = toastSeq++
+	const kind = input.kind ?? "info"
+	// Errors persist until dismissed — easy to miss a 3.5s flash
+	// for a real failure. Success/info auto-dismiss as before.
+	const ttl = input.ttl ?? (kind === "error" ? 0 : 3500)
 	const t: Toast = {
 		id,
-		kind: input.kind ?? "info",
+		kind,
 		message: input.message,
-		ttl: input.ttl ?? 3500,
+		ttl,
 	}
 	toasts.update((arr) => [...arr, t])
 	if (t.ttl > 0) {

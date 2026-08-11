@@ -106,6 +106,10 @@ pub fn run() {
             commands::list_snapshots,
             commands::restore_snapshot,
             commands::delete_snapshot,
+            commands::list_terminals,
+            commands::list_editors,
+            commands::open_in_terminal,
+            commands::open_in_editor,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

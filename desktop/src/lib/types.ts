@@ -142,3 +142,15 @@ export type SnapshotInfo = {
 	size_bytes: number
 	modified_at: string
 }
+
+export type TerminalApp = {
+	id: string
+	label: string
+	is_default: boolean
+}
+
+export type EditorApp = {
+	id: string
+	label: string
+	is_default: boolean
+}
