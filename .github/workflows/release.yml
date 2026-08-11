@@ -12,8 +12,25 @@ permissions:
   contents: write
 
 jobs:
+  quality:
+    name: quality gate (fmt + clippy + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: fmt check
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --workspace --exclude vobes-desktop --all-targets -- -D warnings
+      - name: test
+        run: cargo test --workspace --exclude vobes-desktop
+
   release:
     name: release (${{ matrix.platform }})
+    needs: quality
     strategy:
       fail-fast: false
       matrix:
