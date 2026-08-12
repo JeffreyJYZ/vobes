@@ -67,13 +67,26 @@ Always run the relevant checks before claiming a task is done.
 
 ## Release flow
 
-- Bump version in `desktop/src-tauri/tauri.conf.json`,
-  `desktop/package.json`, and `crates/*/Cargo.toml` (root workspace
-  package too).
-- Tag with `vX.Y.Z`. `.github/workflows/release.yml` creates a **draft**
-  GitHub release — the user publishes manually.
-- A `quality` job (`fmt + clippy + test`, `--exclude vobes-desktop`)
-  gates the release build. It must pass.
+Every crate carries its own `version = "X.Y.Z"` literal — there is no
+shared workspace version. CLI tools (`vobes-cli`, `vobes-mcp`) and the
+desktop (`vobes-desktop`, plus `desktop/package.json` and
+`desktop/src-tauri/tauri.conf.json`) each version independently. Bump
+only the crates that actually changed.
+
+To bump a crate:
+
+1. Edit its `version =` line in its own `Cargo.toml`.
+2. If another workspace crate depends on it via `workspace = true`,
+   also bump the matching `version =` line in the root `[workspace.dependencies]`
+   table so `cargo publish` resolves.
+3. Tag with `vX.Y.Z` only when the **desktop** version changed.
+   Crates.io-only bumps don't need a tag — `cargo publish -p <name>`
+   is enough.
+
+`.github/workflows/release.yml` creates a **draft** GitHub release
+named `Vobes vX.Y.Z Pre-alpha` — the user publishes manually. A
+`quality` job (`fmt + clippy + test`, `--exclude vobes-desktop`) gates
+the release build.
 
 ## Schema migrations
 
