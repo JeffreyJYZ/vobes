@@ -289,19 +289,19 @@ fn terminal_command(dir: &Path, app: Option<&str>) -> Command {
 fn editor_command(dir: &Path, app: Option<&str>) -> Command {
     let app = app
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| default_linux_editor());
+        .map(str::to_string)
+        .unwrap_or_else(default_linux_editor);
     let mut c = Command::new(app);
     c.arg(dir);
     c
 }
 
 #[cfg(target_os = "linux")]
-fn default_linux_editor() -> &'static str {
+fn default_linux_editor() -> String {
     std::env::var("EDITOR")
         .ok()
-        .as_deref()
         .filter(|s| !s.is_empty())
-        .unwrap_or("code")
+        .unwrap_or_else(|| "code".into())
 }
 
 #[cfg(target_os = "linux")]
