@@ -84,12 +84,36 @@ Highlights:
 - **Command palette** (`⌘K` / `Ctrl+K`) — fuzzy-find vobes and run any action
 - **Global shortcut** (`Ctrl+Alt+V`) — summon the palette from any app
 - **Attention section** — dirty repos, unpushed, behind upstream at a glance
+- **Split-button openers** — launch any vobe in the user's chosen terminal or editor; defaults stay sticky per-app
+- **Set-as-default star** in the terminal/editor dropdown — pin a favourite without leaving the menu; persisted across sessions
+- **Persistent error toasts** with a close `×` so failures don't flash past you
+- **Reset and rescan** from the dashboard when the cached project list drifts
 - **Project detail** — git state, last commit, notes, README preview, TODO scrape, context-pack copy
 - **File watcher** — incremental refresh when files change
-- **Deep links** — `vobes://open/<name>` and `vobes://search?q=…`
+- **Deep links** — `vobes://open/<name>` and `vobes://search?q=…` (registered by the installed bundle; not active in `cargo tauri dev`)
 - **Notifications** — opt-in alert when a vobe falls behind upstream
 - **Saved views** — pin a search to the sidebar
-- **In-app settings** — edit roots, theme, git cache without touching TOML
+- **In-app settings** — edit roots, theme, git cache, snapshot history without touching TOML
+
+### First run
+
+The desktop ships with an empty Dashboard. Configure scan roots in
+**Settings → Roots**, then click **Reset and rescan** (or hit
+`⌘K` → "Rescan") to populate it. The same `config.toml` is shared with
+the CLI.
+
+### Search syntax
+
+The command palette and Dashboard search accept predicates prefixed by a
+key (case-insensitive, whitespace-tolerant):
+
+- `tag:rust` — only vobes tagged `rust`
+- `lang:rust` / `fw:react` / `pm:pnpm` — language, framework, package manager
+- `is:dirty` / `is:behind` / `is:pinned` / `is:attention` — git/pin flags
+- `name:foo` — name substring; bare words are also fuzzy-matched
+
+A saved filter is just a named query — pin it to the sidebar for a
+personal workspace scoped to a tag, language, or attention slice.
 
 ### Prerequisites
 
@@ -131,8 +155,12 @@ Both faces talk to the same core. Capabilities should match; gaps are bugs.
 | Saved filters | — | sidebar + `save_saved_filter` | desktop-only surface for now |
 | Workspaces (tag scope) | — | sidebar tag click, `tag:X` query | desktop-only surface for now |
 | Agent attribution | `VOBES_ACTOR=agent vbs …` | inherits env | `ActivityEvent::now_env` |
-| MCP tools | — | — | `vobes_list/show/search/recent_activity/context` |
+| MCP tools | `vobes-mcp` binary | — | `vobes_list/show/search/recent_activity/context` over stdio |
 | Reset + rescan | `reset --yes` | "Reset and rescan" | both call `Store::purge_all` |
+| Pick terminal app | — | split-button selector | `list_terminals` + `open_terminal_with` |
+| Pick editor app | — | split-button selector | `list_editors` + `open_in_editor` |
+| Persistent defaults | — | star in terminal/editor dropdown | localStorage (`vobes:default-terminal/editor`) |
+| Snapshot history UI | — | Settings → Snapshots list + Restore | desktop-only surface; CLI `import` pending |
 
 Where the CLI is missing a surface that exists in the desktop (saved
 filters, workspaces, pin/tags/notes CLI commands), it's tracked as
