@@ -107,14 +107,14 @@ jobs:
         with:
           projectPath: desktop
           tagName: ${{ github.ref_name }}
-          releaseName: "Vobes ${{ github.ref_name }}"
+          releaseName: "Vobes ${{ github.ref_name }} Pre-alpha"
           releaseBody: |
-            Vobes ${{ github.ref_name }} — pre-alpha.
+            Vobes ${{ github.ref_name }} — Pre-alpha.
 
             Desktop app (unsigned): expect Gatekeeper / SmartScreen warnings on first run.
             macOS desktop bundle is universal (arm64 + x64).
             Linux desktop: x64 and arm64 (deb + appimage).
-            CLI binary `vbs` for each platform/arch is attached as `vbs-<platform>-<arch>[.exe]`.
+            CLI: `cargo install vobes-cli` (or `cargo install vobes-mcp` for the agent server).
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.platform == 'macos' && '--target universal-apple-darwin' || '' }}
