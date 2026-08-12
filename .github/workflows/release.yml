@@ -118,19 +118,3 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.platform == 'macos' && '--target universal-apple-darwin' || '' }}
-
-  publish:
-    name: publish to crates.io
-    needs: quality
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: publish workspace
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --workspace --token "$CARGO_REGISTRY_TOKEN"
