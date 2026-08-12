@@ -14,4 +14,5 @@ pub mod rm;
 pub mod scan;
 pub mod show;
 pub mod sync;
+pub mod update;
 pub mod watch;
