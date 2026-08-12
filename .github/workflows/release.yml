@@ -132,18 +132,21 @@ jobs:
           mkdir -p cli
           cp target/release/vbs cli/vbs-macos-aarch64
           cp target/x86_64-apple-darwin/release/vbs cli/vbs-macos-x64
+          for f in cli/vbs-*; do [ -f "$f" ] && sha256sum "$f" | awk '{print $1}' > "$f.sha256"; done
 
       - name: package CLI binary (linux x64)
         if: matrix.platform == 'linux'
         run: |
           mkdir -p cli
           cp target/release/vbs cli/vbs-linux-x64
+          for f in cli/vbs-*; do [ -f "$f" ] && sha256sum "$f" | awk '{print $1}' > "$f.sha256"; done
 
       - name: package CLI binary (linux arm64)
         if: matrix.platform == 'linux-arm'
         run: |
           mkdir -p cli
           cp target/release/vbs cli/vbs-linux-aarch64
+          for f in cli/vbs-*; do [ -f "$f" ] && sha256sum "$f" | awk '{print $1}' > "$f.sha256"; done
 
       - name: package CLI binary (windows)
         if: matrix.platform == 'windows'
@@ -151,6 +154,7 @@ jobs:
         run: |
           mkdir -p cli
           cp target/release/vbs.exe cli/vbs-windows-x64.exe
+          for f in cli/vbs-*; do [ -f "$f" ] && sha256sum "$f" | awk '{print $1}' > "$f.sha256"; done
 
       - name: upload CLI to release
         uses: softprops/action-gh-release@v2
