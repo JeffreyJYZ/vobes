@@ -12,8 +12,10 @@
 use std::env;
 use std::fs;
 use std::io::Read;
-use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -38,6 +40,21 @@ struct Asset {
 }
 
 pub fn run(check_only: bool, target_override: Option<&str>, insecure: bool) -> Result<()> {
+    #[cfg(not(unix))]
+    {
+        let _ = (check_only, target_override, insecure);
+        println!("vbs update: not yet supported on windows — reinstall via your package manager");
+        return Ok(());
+    }
+
+    #[cfg(unix)]
+    {
+        run_unix(check_only, target_override, insecure)
+    }
+}
+
+#[cfg(unix)]
+fn run_unix(check_only: bool, target_override: Option<&str>, insecure: bool) -> Result<()> {
     let current = std::env::current_exe()
         .map_err(|e| vobes_core::Error::internal(format!("locate current binary: {e}")))?;
     let current = current.canonicalize().unwrap_or(current);
