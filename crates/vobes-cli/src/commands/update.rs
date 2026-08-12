@@ -32,7 +32,9 @@ pub fn run(_check: bool, _target: Option<&str>, _insecure: bool) -> Result<()> {
     let local = env!("CARGO_PKG_VERSION").to_string();
     println!("vbs {local}");
 
-    match detect_manager(&current) {
+    let cargo_home = env::var("CARGO_HOME").ok();
+    let home = env::var("HOME").ok();
+    match detect_manager(&current, cargo_home.as_deref(), home.as_deref()) {
         Some((mgr, cmd)) => {
             println!("managed by {mgr}");
             println!("update with: {cmd}");
@@ -44,14 +46,18 @@ pub fn run(_check: bool, _target: Option<&str>, _insecure: bool) -> Result<()> {
     Ok(())
 }
 
-fn detect_manager(path: &Path) -> Option<(&'static str, &'static str)> {
+fn detect_manager(
+    path: &Path,
+    cargo_home: Option<&str>,
+    home: Option<&str>,
+) -> Option<(&'static str, &'static str)> {
     let s = path.to_string_lossy();
-    if let Ok(cargo_home) = env::var("CARGO_HOME") {
+    if let Some(cargo_home) = cargo_home {
         if s.starts_with(&format!("{cargo_home}/bin/")) {
             return Some(("cargo", CARGO_CMD));
         }
     }
-    if let Ok(home) = env::var("HOME") {
+    if let Some(home) = home {
         if s.starts_with(&format!("{home}/.cargo/bin/")) {
             return Some(("cargo", CARGO_CMD));
         }
@@ -68,30 +74,24 @@ mod tests {
 
     #[test]
     fn cargo_home_match() {
-        env::set_var("CARGO_HOME", "/x/cargo");
-        env::remove_var("HOME");
         assert_eq!(
-            detect_manager(Path::new("/x/cargo/bin/vbs")).unwrap(),
+            detect_manager(Path::new("/x/cargo/bin/vbs"), Some("/x/cargo"), None).unwrap(),
             ("cargo", CARGO_CMD)
         );
     }
 
     #[test]
     fn home_cargo_match() {
-        env::remove_var("CARGO_HOME");
-        env::set_var("HOME", "/x");
         assert_eq!(
-            detect_manager(Path::new("/x/.cargo/bin/vbs")).unwrap(),
+            detect_manager(Path::new("/x/.cargo/bin/vbs"), None, Some("/x")).unwrap(),
             ("cargo", CARGO_CMD)
         );
     }
 
     #[test]
     fn homebrew_match() {
-        env::remove_var("CARGO_HOME");
-        env::set_var("HOME", "/x");
         assert_eq!(
-            detect_manager(Path::new("/opt/homebrew/bin/vbs"))
+            detect_manager(Path::new("/opt/homebrew/bin/vbs"), None, None)
                 .unwrap()
                 .0,
             "Homebrew (macOS)"
@@ -100,8 +100,6 @@ mod tests {
 
     #[test]
     fn unmanaged_returns_none() {
-        env::remove_var("CARGO_HOME");
-        env::set_var("HOME", "/x");
-        assert!(detect_manager(Path::new("/x/.local/bin/vbs")).is_none());
+        assert!(detect_manager(Path::new("/x/.local/bin/vbs"), None, Some("/x")).is_none());
     }
 }
