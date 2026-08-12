@@ -119,46 +119,18 @@ jobs:
           prerelease: false
           args: ${{ matrix.platform == 'macos' && '--target universal-apple-darwin' || '' }}
 
-      - name: build CLI binary (native)
-        run: cargo build --release -p vobes-cli
+  publish:
+    name: publish to crates.io
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: build CLI binary (intel mac)
-        if: matrix.platform == 'macos'
-        run: cargo build --release -p vobes-cli --target x86_64-apple-darwin
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: package CLI binary (macos)
-        if: matrix.platform == 'macos'
-        run: |
-          mkdir -p cli
-          cp target/release/vbs cli/vbs-macos-aarch64
-          cp target/x86_64-apple-darwin/release/vbs cli/vbs-macos-x64
-          for f in cli/vbs-*; do [ -f "$f" ] && sha256sum "$f" | awk '{print $1}' > "$f.sha256"; done
+      - uses: Swatinem/rust-cache@v2
 
-      - name: package CLI binary (linux x64)
-        if: matrix.platform == 'linux'
-        run: |
-          mkdir -p cli
-          cp target/release/vbs cli/vbs-linux-x64
-          for f in cli/vbs-*; do [ -f "$f" ] && sha256sum "$f" | awk '{print $1}' > "$f.sha256"; done
-
-      - name: package CLI binary (linux arm64)
-        if: matrix.platform == 'linux-arm'
-        run: |
-          mkdir -p cli
-          cp target/release/vbs cli/vbs-linux-aarch64
-          for f in cli/vbs-*; do [ -f "$f" ] && sha256sum "$f" | awk '{print $1}' > "$f.sha256"; done
-
-      - name: package CLI binary (windows)
-        if: matrix.platform == 'windows'
-        shell: bash
-        run: |
-          mkdir -p cli
-          cp target/release/vbs.exe cli/vbs-windows-x64.exe
-          for f in cli/vbs-*; do [ -f "$f" ] && sha256sum "$f" | awk '{print $1}' > "$f.sha256"; done
-
-      - name: upload CLI to release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          draft: true
-          files: cli/*
+      - name: publish workspace
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --workspace --token "$CARGO_REGISTRY_TOKEN"
