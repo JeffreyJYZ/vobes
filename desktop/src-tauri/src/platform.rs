@@ -296,11 +296,12 @@ fn editor_command(dir: &Path, app: Option<&str>) -> Command {
 }
 
 #[cfg(target_os = "linux")]
-fn default_linux_editor() -> String {
+fn default_linux_editor() -> &'static str {
     std::env::var("EDITOR")
         .ok()
+        .as_deref()
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "code".into())
+        .unwrap_or("code")
 }
 
 #[cfg(target_os = "linux")]
