@@ -1,7 +1,7 @@
 [package]
 name = "vobes-core"
-description = "Vobes shared domain models, traits, and error types."
-version.workspace = true
+description = "Vobes shared types, error type, and plugin trait surface."
+version = "0.1.5"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
