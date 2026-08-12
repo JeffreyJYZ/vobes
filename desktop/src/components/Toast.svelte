@@ -4,23 +4,30 @@
 
 <div class="toast-stack" aria-live="polite" aria-atomic="false">
 	{#each $toasts as t (t.id)}
-		<button
-			type="button"
+		<div
 			class="toast {t.kind}"
-			on:click={() => dismissToast(t.id)}
+			role="button"
+			tabindex="0"
 			aria-label="Dismiss notification"
+			on:click={() => dismissToast(t.id)}
+			on:keydown={(e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
+					dismissToast(t.id);
+				}
+			}}
 		>
 			<span class="dot"></span>
 			<span class="msg">{t.message}</span>
 			{#if t.kind === "error" || t.ttl === 0}
-				<span
+				<button
+					type="button"
 					class="close"
-					role="button"
 					aria-label="Close"
 					on:click|stopPropagation={() => dismissToast(t.id)}
-				>×</span>
+				>×</button>
 			{/if}
-		</button>
+		</div>
 	{/each}
 </div>
 
@@ -76,6 +83,9 @@
 	}
 	.toast .close {
 		flex: none;
+		border: none;
+		background: transparent;
+		font: inherit;
 		font-size: 16px;
 		line-height: 1;
 		color: var(--fg-muted);

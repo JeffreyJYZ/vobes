@@ -22,6 +22,12 @@
 	/// stretching to the trigger width. Needed when the trigger is a
 	/// narrow chevron button next to a wide action button.
 	export let menuAlign: "left" | "right" = "left";
+	/// When true, each option shows a star so the user can pin a
+	/// default (e.g. preferred terminal/editor) without leaving the
+	/// menu. The star is filled for the option matching `defaultValue`.
+	export let defaultable: boolean = false;
+	export let defaultValue: string | null = null;
+	export let onSetDefault: (v: string) => void = () => {};
 
 	let open = false;
 	let triggerEl: HTMLButtonElement;
@@ -102,6 +108,20 @@
 								aria-hidden="true">✓</span
 							>{/if}
 					</button>
+					{#if defaultable}
+						<button
+							type="button"
+							class="star"
+							class:on={o.value === defaultValue}
+							aria-label={`Set ${o.label} as default`}
+							title={o.value === defaultValue
+								? "Default"
+								: "Set as default"}
+							on:click={() => onSetDefault(o.value)}
+						>
+							{o.value === defaultValue ? "★" : "☆"}
+						</button>
+					{/if}
 				</li>
 			{/each}
 		</ul>
@@ -185,8 +205,13 @@
 	.menu li {
 		margin: 0;
 		padding: 0;
+		display: flex;
+		align-items: center;
+		gap: 2px;
 	}
 	.opt {
+		flex: 1;
+		min-width: 0;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -212,6 +237,23 @@
 	.opt .check {
 		color: var(--accent);
 		font-weight: 700;
+	}
+	.star {
+		flex: none;
+		border: none;
+		background: transparent;
+		color: var(--fg-faint);
+		font-size: 14px;
+		line-height: 1;
+		padding: 7px 10px;
+		cursor: pointer;
+		border-radius: 5px;
+	}
+	.star:hover {
+		color: var(--warn);
+	}
+	.star.on {
+		color: var(--warn);
 	}
 	@keyframes pop {
 		from {

@@ -44,14 +44,19 @@
 	let editors: EditorApp[] = [];
 	let selectedTerminal: string | null = null;
 	let selectedEditor: string | null = null;
+	let defaultTerminal: string | null = null;
+	let defaultEditor: string | null = null;
+
+	const DEFAULT_TERMINAL_KEY = "vobes:default-terminal";
+	const DEFAULT_EDITOR_KEY = "vobes:default-editor";
 
 	$: terminalOptions = terminals.map((t) => ({
 		value: t.id,
-		label: t.is_default ? `${t.label} (default)` : t.label,
+		label: t.id === defaultTerminal ? `${t.label} (default)` : t.label,
 	}));
 	$: editorOptions = editors.map((e) => ({
 		value: e.id,
-		label: e.is_default ? `${e.label} (default)` : e.label,
+		label: e.id === defaultEditor ? `${e.label} (default)` : e.label,
 	}));
 	$: terminalLabel =
 		terminals
@@ -81,16 +86,44 @@
 				api.listTerminals(),
 				api.listEditors(),
 			]);
-			selectedTerminal =
-				terminals.find((t) => t.is_default)?.id ??
-				terminals[0]?.id ??
-				null;
-			selectedEditor =
-				editors.find((e) => e.is_default)?.id ?? editors[0]?.id ?? null;
+			const savedT = localStorage.getItem(DEFAULT_TERMINAL_KEY);
+			const savedE = localStorage.getItem(DEFAULT_EDITOR_KEY);
+			defaultTerminal =
+				savedT && terminals.some((t) => t.id === savedT)
+					? savedT
+					: terminals.find((t) => t.is_default)?.id ?? null;
+			defaultEditor =
+				savedE && editors.some((e) => e.id === savedE)
+					? savedE
+					: editors.find((e) => e.is_default)?.id ?? null;
+			selectedTerminal = defaultTerminal ?? terminals[0]?.id ?? null;
+			selectedEditor = defaultEditor ?? editors[0]?.id ?? null;
 		} catch (e) {
 			console.warn("list_terminals/editors failed:", e);
 		}
 	});
+
+	function setDefaultTerminal(v: string) {
+		defaultTerminal = v;
+		localStorage.setItem(DEFAULT_TERMINAL_KEY, v);
+		pushToast({
+			kind: "success",
+			message: `Default terminal: ${
+				terminals.find((t) => t.id === v)?.label ?? v
+			}.`,
+		});
+	}
+
+	function setDefaultEditor(v: string) {
+		defaultEditor = v;
+		localStorage.setItem(DEFAULT_EDITOR_KEY, v);
+		pushToast({
+			kind: "success",
+			message: `Default editor: ${
+				editors.find((e) => e.id === v)?.label ?? v
+			}.`,
+		});
+	}
 
 	async function loadActivity(id: string) {
 		try {
@@ -377,6 +410,9 @@
 							ariaLabel="Choose terminal"
 							compact={true}
 							menuAlign="right"
+							defaultable={true}
+							defaultValue={defaultTerminal}
+							onSetDefault={setDefaultTerminal}
 							onChange={(v) => (selectedTerminal = v)}
 						/>
 					{/if}
@@ -402,6 +438,9 @@
 							ariaLabel="Choose editor"
 							compact={true}
 							menuAlign="right"
+							defaultable={true}
+							defaultValue={defaultEditor}
+							onSetDefault={setDefaultEditor}
 							onChange={(v) => (selectedEditor = v)}
 						/>
 					{/if}

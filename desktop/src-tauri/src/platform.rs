@@ -58,22 +58,12 @@ fn reveal_command(path: &Path) -> Command {
     c
 }
 
-/// Spawn a new OS terminal at the given directory.
-///
-/// We deliberately pick portable commands instead of the user's
-/// configured `$EDITOR`/`$SHELL` so this works on a fresh install
-/// without configuration.
-pub fn open_terminal(path: &Path) -> vobes_core::Result<()> {
-    open_terminal_with(path, None)
-}
-
 /// Spawn a terminal at `path`. If `app` is `None` (or refers to a
 /// terminal we do not know about), we fall back to the platform
-/// default — same behaviour as `open_terminal`. On macOS `app` is
-/// the app name as passed to `open -a` (e.g. `"iTerm"`,
-/// `"Terminal"`); on Linux it is an executable name resolvable on
-/// `$PATH`; on Windows it is one of `"wt"`, `"powershell"`,
-/// `"pwsh"`, or `"cmd"`.
+/// default. On macOS `app` is the app name as passed to `open -a`
+/// (e.g. `"iTerm"`, `"Terminal"`); on Linux it is an executable name
+/// resolvable on `$PATH`; on Windows it is one of `"wt"`,
+/// `"powershell"`, `"pwsh"`, or `"cmd"`.
 pub fn open_terminal_with(path: &Path, app: Option<&str>) -> vobes_core::Result<()> {
     let dir = if path.is_dir() {
         path
@@ -442,11 +432,6 @@ fn list_editors_platform() -> Vec<EditorApp> {
         });
     }
     out
-}
-
-#[cfg(target_os = "macos")]
-fn path_exists_on_path(cmd: &str) -> bool {
-    which_exists(cmd)
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]

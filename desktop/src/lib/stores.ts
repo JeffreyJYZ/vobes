@@ -273,7 +273,7 @@ export function pushToast(input: {
 		message: input.message,
 		ttl,
 	}
-	toasts.update((arr) => [...arr, t])
+	toasts.update((arr) => [...arr, t].slice(-3))
 	if (t.ttl > 0) {
 		setTimeout(() => dismissToast(id), t.ttl)
 	}
