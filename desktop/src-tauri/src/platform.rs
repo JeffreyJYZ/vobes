@@ -154,8 +154,22 @@ pub fn open_editor(path: &Path, app: Option<&str>) -> vobes_core::Result<()> {
 #[cfg(target_os = "macos")]
 fn terminal_command(dir: &Path, app: Option<&str>) -> Command {
     let app = app.unwrap_or("Terminal");
+    let extra: &[&str] = match app {
+        "Tabby" => &["open"],
+        "Alacritty" => &["--working-directory"],
+        "kitty" => &["--directory"],
+        "WezTerm" => &["start", "--cwd"],
+        _ => &[],
+    };
     let mut c = Command::new("open");
-    c.arg("-a").arg(app).arg(dir);
+    c.arg("-a").arg(app);
+    if !extra.is_empty() {
+        c.arg("--args");
+        for a in extra {
+            c.arg(a);
+        }
+    }
+    c.arg(dir);
     c
 }
 
@@ -171,7 +185,6 @@ fn list_terminals_platform() -> Vec<TerminalApp> {
         ("Alacritty", "/Applications/Alacritty.app"),
         ("kitty", "/Applications/kitty.app"),
         ("WezTerm", "/Applications/WezTerm.app"),
-        ("Hyper", "/Applications/Hyper.app"),
         ("Tabby", "/Applications/Tabby.app"),
         ("Wave", "/Applications/Wave.app"),
         ("Ghostty", "/Applications/Ghostty.app"),
@@ -276,13 +289,48 @@ fn terminal_command(dir: &Path, app: Option<&str>) -> Command {
     let app = app
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| default_linux_terminal());
-    let mut c = Command::new(app);
-    c.current_dir(dir);
-    // gnome-terminal needs --working Directory to land on the dir.
-    if app == "gnome-terminal" {
-        c.arg(format!("--working-directory={}", dir.display()));
+    match app {
+        "alacritty" => {
+            let mut c = Command::new(app);
+            c.arg("--working-directory").arg(dir);
+            c
+        }
+        "kitty" => {
+            let mut c = Command::new(app);
+            c.arg("--directory").arg(dir);
+            c
+        }
+        "wezterm" => {
+            let mut c = Command::new(app);
+            c.arg("start").arg("--cwd").arg(dir);
+            c
+        }
+        "gnome-terminal" => {
+            let mut c = Command::new(app);
+            c.arg(format!("--working-directory={}", dir.display()));
+            c
+        }
+        "konsole" => {
+            let mut c = Command::new(app);
+            c.arg("--workdir").arg(dir);
+            c
+        }
+        "xfce4-terminal" => {
+            let mut c = Command::new(app);
+            c.arg(format!("--working-directory={}", dir.display()));
+            c
+        }
+        "foot" => {
+            let mut c = Command::new(app);
+            c.arg("--working-directory").arg(dir);
+            c
+        }
+        _ => {
+            let mut c = Command::new(app);
+            c.current_dir(dir);
+            c
+        }
     }
-    c
 }
 
 #[cfg(target_os = "linux")]
@@ -390,12 +438,13 @@ fn list_terminals_platform() -> Vec<TerminalApp> {
 #[cfg(target_os = "windows")]
 fn terminal_command(dir: &Path, app: Option<&str>) -> Command {
     let app = app.unwrap_or("cmd");
-    let mut c = Command::new("cmd");
-    c.arg("/C")
-        .arg("start")
-        .arg(app)
-        .arg("/K")
-        .arg(format!("cd /D \"{}\"", dir.display()));
+    if app == "wt" {
+        let mut c = Command::new(app);
+        c.arg("-d").arg(dir);
+        return c;
+    }
+    let mut c = Command::new(app);
+    c.current_dir(dir);
     c
 }
 
