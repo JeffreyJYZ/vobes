@@ -27,13 +27,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
-            let ctx = match DesktopCtx::load() {
-                Ok(c) => Arc::new(c),
-                Err(e) => {
-                    eprintln!("vobes: failed to load app context: {e}");
-                    return Err(e.into());
-                }
-            };
+            let ctx = Arc::new(DesktopCtx::load());
             app.manage(ctx.clone());
 
             // Register the deep-link URL scheme at runtime on Linux/Windows
