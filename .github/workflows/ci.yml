@@ -23,6 +23,10 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - uses: mozilla-actions/sccache-action@v0
+        with:
+          version: "0.17.0"
+
       - uses: Swatinem/rust-cache@v2
 
       - name: fmt check
@@ -87,6 +91,10 @@ jobs:
       - name: install frontend deps
         working-directory: desktop
         run: pnpm install --frozen-lockfile
+
+      - uses: mozilla-actions/sccache-action@v0
+        with:
+          version: "0.17.0"
 
       - uses: Swatinem/rust-cache@v2
         with:
