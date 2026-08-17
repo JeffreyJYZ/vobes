@@ -161,6 +161,63 @@ One-time setup:
 Until then, builds still work, releases still publish as drafts, but users
 on older versions get no update prompt.
 
+### Crash reporting
+
+Panics and unhandled errors flow to a Sentry-compatible endpoint
+(`sentry` Rust crate + `@sentry/svelte` frontend). Both sides read their
+DSN from an env var and no-op when unset, so dev builds stay local.
+
+The Tauri side doesn't care which Sentry-compatible server you point at
+— the only requirement is a reachable DSN URL. Self-hosting options:
+
+- **GlitchTip** (Sentry-API-compatible) pointed at any Postgres. The
+  Vobes stack assumes GlitchTip + Postgres, but you can also point at
+  Sentry SaaS, Sentry self-hosted, Highlight, or any other compatible
+  endpoint.
+
+For the Postgres behind GlitchTip, any provider works — the
+`DATABASE_URL` env var accepts any libpq-compatible connection string:
+
+| Provider | Notes |
+|---|---|
+| Neon | Free tier 0.5 GB, AWS-backed. Variable reachability from mainland China. |
+| Aliyun RDS for PostgreSQL / PolarDB | China-hosted, ICP-friendly. Recommended for China users. |
+| Tencent Cloud TDSQL-C / PostgreSQL | Same — China-hosted, low latency from CN. |
+| Supabase | Hosted Postgres + dashboard. Good if you also want auth later. |
+| Local Docker | `docker run -e POSTGRES_PASSWORD=... postgres:16`. Fine for self-hosting. |
+
+If your users are in mainland China and Neon/Sentry SaaS feel slow, host
+GlitchTip on an Aliyun ECS or Tencent CVM instance in the same region
+as the Postgres.
+
+One-time setup:
+
+1. Provision GlitchTip + Postgres. GlitchTip needs `DATABASE_URL`
+   pointing at the Postgres, `SITE_URL`, `SECRET_KEY` (any random
+   string), and a public hostname. Docker example:
+   ```bash
+   docker run -d --name glitchtip \
+     -e DATABASE_URL=postgres://glitchtip:secret@postgres:5432/glitchtip \
+     -e SITE_URL=https://glitchtip.your-domain.com \
+     -e SECRET_KEY=$(openssl rand -hex 32) \
+     -p 8000:8000 \
+     glitchtip/glitchtip
+   ```
+2. Create a project in GlitchTip, copy the DSN (format
+   `https://<key>@<host>/<project-id>`).
+3. Set the DSN at build time:
+   ```bash
+   # Rust side (panic hook)
+   export VOBES_SENTRY_DSN='https://...@.../...'
+   # Frontend (init in main.ts)
+   export VITE_SENTRY_DSN='https://...@.../...'
+   ```
+4. For production builds, add both env vars to the release workflow
+   env block (`.github/workflows/release.yml`).
+
+Until the DSN is set, crashes still print to stderr + show in the
+"fatal" overlay — nothing leaves the machine.
+
 ## CLI ↔ desktop parity
 
 Both faces talk to the same core. Capabilities should match; gaps are bugs.
