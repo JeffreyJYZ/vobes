@@ -1,5 +1,16 @@
+import * as Sentry from "@sentry/svelte"
 import App from "./App.svelte"
 import "./app.css"
+
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN as string | undefined
+if (sentryDsn) {
+	Sentry.init({
+		dsn: sentryDsn,
+		release: `vobes-desktop@${__APP_VERSION__}`,
+		environment: import.meta.env.DEV ? "development" : "production",
+		tracesSampleRate: 0,
+	})
+}
 
 function showFatal(msg: string) {
 	let el = document.getElementById("fatal")

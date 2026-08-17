@@ -19,6 +19,8 @@ use crate::watcher::VobesWatcher;
 /// Entry point invoked by `main.rs`.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _sentry = init_sentry();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -109,4 +111,29 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Initialize Sentry crash reporting. No-op when `VOBES_SENTRY_DSN`
+/// is unset so dev builds stay local. The returned guard must be
+/// kept alive for the process lifetime — dropping it at scope exit
+/// would flush pending events too early.
+fn init_sentry() -> Option<sentry::ClientInitGuard> {
+    let dsn = std::env::var("VOBES_SENTRY_DSN")
+        .ok()
+        .filter(|s| !s.is_empty())?;
+    let env = if cfg!(debug_assertions) {
+        "development"
+    } else {
+        "production"
+    };
+    let opts = sentry::ClientOptions {
+        dsn: Some(
+            dsn.parse()
+                .expect("VOBES_SENTRY_DSN is not a valid Sentry DSN"),
+        ),
+        release: Some(format!("vobes-desktop@{}", env!("CARGO_PKG_VERSION")).into()),
+        environment: Some(env.into()),
+        ..Default::default()
+    };
+    Some(sentry::init(opts))
 }
