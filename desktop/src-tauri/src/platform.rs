@@ -227,6 +227,16 @@ fn editor_command(dir: &Path, app: Option<&str>) -> Command {
         "BBEdit" => Some("bbedit"),
         "Xcode" => Some("xed"),
         "Nova" => Some("nova"),
+        "IntelliJ IDEA" => Some("idea"),
+        "WebStorm" => Some("webstorm"),
+        "PyCharm" => Some("pycharm"),
+        "GoLand" => Some("goland"),
+        "CLion" => Some("clion"),
+        "RubyMine" => Some("rubymine"),
+        "PhpStorm" => Some("phpstorm"),
+        "Rider" => Some("rider"),
+        "DataGrip" => Some("datagrip"),
+        "Fleet" => Some("fleet"),
         _ => None,
     };
     if let Some(sh) = shim {
@@ -252,6 +262,14 @@ fn list_editors_platform() -> Vec<EditorApp> {
         ("Nova", "/Applications/Nova.app"),
         ("Xcode", "/Applications/Xcode.app"),
         ("TextEdit", "/System/Applications/TextEdit.app"),
+        ("IntelliJ IDEA", "/Applications/IntelliJ IDEA.app"),
+        ("WebStorm", "/Applications/WebStorm.app"),
+        ("PyCharm", "/Applications/PyCharm.app"),
+        ("GoLand", "/Applications/GoLand.app"),
+        ("CLion", "/Applications/CLion.app"),
+        ("Rider", "/Applications/Rider.app"),
+        ("Fleet", "/Applications/Fleet.app"),
+        ("CotEditor", "/Applications/CotEditor.app"),
     ];
     let mut out = Vec::new();
     for (id, path) in candidates {
@@ -365,6 +383,14 @@ fn list_editors_platform() -> Vec<EditorApp> {
         ("emacs", "Emacs"),
         ("kak", "Kakoune"),
         ("micro", "micro"),
+        ("idea", "IntelliJ IDEA"),
+        ("webstorm", "WebStorm"),
+        ("pycharm", "PyCharm"),
+        ("goland", "GoLand"),
+        ("clion", "CLion"),
+        ("rider", "Rider"),
+        ("datagrip", "DataGrip"),
+        ("fleet", "Fleet"),
     ];
     let mut out: Vec<EditorApp> = candidates
         .iter()
@@ -464,6 +490,13 @@ fn list_editors_platform() -> Vec<EditorApp> {
         ("cursor", "Cursor"),
         ("zed", "Zed"),
         ("notepad", "Notepad"),
+        ("notepad++", "Notepad++"),
+        ("idea", "IntelliJ IDEA"),
+        ("webstorm", "WebStorm"),
+        ("pycharm", "PyCharm"),
+        ("goland", "GoLand"),
+        ("clion", "CLion"),
+        ("rider", "Rider"),
     ];
     let mut out: Vec<EditorApp> = candidates
         .iter()
