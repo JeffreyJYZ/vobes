@@ -261,6 +261,10 @@ export function pushToast(input: {
 	kind?: ToastKind
 	message: string
 	ttl?: number
+	action?: {
+		label: string
+		run: () => void | Promise<void>
+	}
 }): number {
 	const id = toastSeq++
 	const kind = input.kind ?? "info"
@@ -272,6 +276,7 @@ export function pushToast(input: {
 		kind,
 		message: input.message,
 		ttl,
+		action: input.action,
 	}
 	toasts.update((arr) => [...arr, t].slice(-3))
 	if (t.ttl > 0) {

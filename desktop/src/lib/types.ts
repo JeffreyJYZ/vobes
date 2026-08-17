@@ -104,6 +104,10 @@ export type Toast = {
 	kind: ToastKind
 	message: string
 	ttl: number
+	action?: {
+		label: string
+		run: () => void | Promise<void>
+	}
 }
 
 export type TodoHit = {

@@ -4,30 +4,46 @@
 
 <div class="toast-stack" aria-live="polite" aria-atomic="false">
 	{#each $toasts as t (t.id)}
-		<div
-			class="toast {t.kind}"
-			role="button"
-			tabindex="0"
-			aria-label="Dismiss notification"
-			on:click={() => dismissToast(t.id)}
-			on:keydown={(e) => {
-				if (e.key === "Enter" || e.key === " ") {
-					e.preventDefault();
-					dismissToast(t.id);
-				}
-			}}
-		>
-			<span class="dot"></span>
-			<span class="msg">{t.message}</span>
-			{#if t.kind === "error" || t.ttl === 0}
+		{#if t.action}
+			<div class="toast {t.kind}" role="group">
+				<span class="dot"></span>
+				<span class="msg">{t.message}</span>
 				<button
 					type="button"
-					class="close"
-					aria-label="Close"
-					on:click|stopPropagation={() => dismissToast(t.id)}
-				>×</button>
-			{/if}
-		</div>
+					class="act"
+					on:click={async () => {
+						const action = t.action;
+						dismissToast(t.id);
+						if (action) await action.run();
+					}}
+				>{t.action.label}</button>
+			</div>
+		{:else}
+			<div
+				class="toast {t.kind}"
+				role="button"
+				tabindex="0"
+				aria-label="Dismiss notification"
+				on:click={() => dismissToast(t.id)}
+				on:keydown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						dismissToast(t.id);
+					}
+				}}
+			>
+				<span class="dot"></span>
+				<span class="msg">{t.message}</span>
+				{#if t.kind === "error" || t.ttl === 0}
+					<button
+						type="button"
+						class="close"
+						aria-label="Close"
+						on:click|stopPropagation={() => dismissToast(t.id)}
+					>×</button>
+				{/if}
+			</div>
+		{/if}
 	{/each}
 </div>
 
@@ -91,6 +107,22 @@
 		color: var(--fg-muted);
 		padding: 2px 0 0 6px;
 		cursor: pointer;
+	}
+	.toast .act {
+		flex: none;
+		border: 1px solid var(--accent);
+		background: transparent;
+		color: var(--accent);
+		font: inherit;
+		font-size: 12px;
+		font-weight: 500;
+		padding: 4px 10px;
+		border-radius: 6px;
+		cursor: pointer;
+	}
+	.toast .act:hover {
+		background: var(--accent);
+		color: var(--bg);
 	}
 	.toast .close:hover {
 		color: var(--fg);
