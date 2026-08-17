@@ -27,6 +27,7 @@
 		view,
 		vobes,
 	} from "./lib/stores";
+	import { addVobe } from "./lib/api";
 	import Activity from "./views/Activity.svelte";
 	import Dashboard from "./views/Dashboard.svelte";
 	import Projects from "./views/Projects.svelte";
@@ -131,28 +132,63 @@
 	});
 
 	function handleDeepLink(url: string) {
-		// Expected shape: vobes://open/<name> or vobes://search?q=foo
+		// Expected shapes:
+		//   vobes://open/<name>     — focus vobe by name
+		//   vobes://open?id=<id>    — focus vobe by stable id (preferred)
+		//   vobes://add?path=<p>    — add vobe at path, then focus
+		//   vobes://search?q=<q>    — save + focus a search query
 		try {
 			const u = new URL(url);
 			if (u.hostname === "open" || u.pathname.startsWith("/open")) {
+				const id = u.searchParams.get("id");
 				const segs = u.pathname.split("/").filter(Boolean);
 				const name = segs[0] ? decodeURIComponent(segs[0]) : "";
-				if (name) {
-					const v = $vobes.find(
-						(v) =>
-							v.name === name ||
-							v.name.toLowerCase() === name.toLowerCase(),
-					);
-					if (v) {
+				const v = id
+					? $vobes.find((v) => v.id === id)
+					: $vobes.find(
+							(v) =>
+								v.name === name ||
+								v.name.toLowerCase() === name.toLowerCase(),
+						);
+				if (v) {
+					selectedVobe.set(v);
+					view.set("projects");
+				} else if (id) {
+					pushToast({
+						kind: "error",
+						message: `No vobe with id "${id}".`,
+					});
+				} else {
+					pushToast({
+						kind: "error",
+						message: `No vobe named "${name}".`,
+					});
+				}
+			} else if (u.hostname === "add") {
+				const path = u.searchParams.get("path");
+				if (!path) {
+					pushToast({
+						kind: "error",
+						message: "vobes://add needs ?path=<path>",
+					});
+					return;
+				}
+				addVobe(path)
+					.then((v) => {
 						selectedVobe.set(v);
 						view.set("projects");
-					} else {
+						refresh();
+					})
+					.catch((e: unknown) => {
+						const msg =
+							e && typeof e === "object" && "message" in e
+								? String((e as { message: unknown }).message)
+								: String(e);
 						pushToast({
 							kind: "error",
-							message: `No vobe named "${name}".`,
+							message: `Could not add "${path}": ${msg}`,
 						});
-					}
-				}
+					});
 			} else if (u.hostname === "search") {
 				const q = u.searchParams.get("q") ?? "";
 				view.set("dashboard");

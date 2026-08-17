@@ -63,6 +63,10 @@ export async function removeVobe(name: string): Promise<void> {
 	return invoke<void>("remove_vobe", { name })
 }
 
+export async function addVobe(path: string): Promise<Vobe> {
+	return invoke<Vobe>("add_vobe", { path })
+}
+
 export async function markOpened(name: string): Promise<void> {
 	return invoke<void>("open_vobe", { name })
 }
