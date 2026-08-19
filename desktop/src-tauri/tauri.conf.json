@@ -51,6 +51,7 @@
       }
     },
     "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZBNzY4QTBDNzEwMDI4ODQKUldTRUtBQnhESXAyYXR6RkNjYnNjeU9OdVZ0akxVUE5LWThEcFNZSVdUdGtVMHZnTzFuZGFMWTgK",
       "endpoints": [
         "https://github.com/JeffreyJYZ/vobes/releases/latest/download/latest.json"
       ],
