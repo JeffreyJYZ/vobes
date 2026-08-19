@@ -51,7 +51,6 @@
       }
     },
     "updater": {
-      "pubkey": "REPLACE_WITH_TAURI_SIGNER_GENERATE_OUTPUT",
       "endpoints": [
         "https://github.com/JeffreyJYZ/vobes/releases/latest/download/latest.json"
       ],
