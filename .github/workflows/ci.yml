@@ -47,7 +47,9 @@ jobs:
           rm -rf "$dest"
           mkdir -p "$dest"
           curl -fsSL "$url" -o "/tmp/${archive}"
-          tar -xf "/tmp/${archive}" -C "$dest"
+          # tar --strip-components=1 flattens sccache-vX.Y.Z-<triple>/sccache
+          # → $dest/sccache directly so $dest is a clean PATH entry.
+          tar -xf "/tmp/${archive}" -C "$dest" --strip-components=1
           echo "$dest" >> "$GITHUB_PATH"
           sccache --version
 
@@ -152,7 +154,9 @@ jobs:
           rm -rf "$dest"
           mkdir -p "$dest"
           curl -fsSL "$url" -o "/tmp/${archive}"
-          tar -xf "/tmp/${archive}" -C "$dest"
+          # tar --strip-components=1 flattens sccache-vX.Y.Z-<triple>/sccache
+          # → $dest/sccache directly so $dest is a clean PATH entry.
+          tar -xf "/tmp/${archive}" -C "$dest" --strip-components=1
           echo "$dest" >> "$GITHUB_PATH"
           sccache --version
 
