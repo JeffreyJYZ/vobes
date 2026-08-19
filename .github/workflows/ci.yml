@@ -25,59 +25,19 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.2
 
-      - name: install sccache
-        shell: bash
-        env:
-          SCCACHE_VERSION: "0.10.0"
-        run: |
-          set -e
-          case "$RUNNER_OS" in
-            Linux)
-              archive="sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-              ;;
-            macOS)
-              archive="sccache-v${SCCACHE_VERSION}-aarch64-apple-darwin.tar.gz"
-              ;;
-            Windows)
-              archive="sccache-v${SCCACHE_VERSION}-x86_64-pc-windows-msvc.zip"
-              ;;
-          esac
-          url="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/${archive}"
-          dest="/tmp/sccache-bin"
-          rm -rf "$dest"
-          mkdir -p "$dest"
-          curl -fsSL "$url" -o "/tmp/${archive}"
-          # tar --strip-components=1 flattens sccache-vX.Y.Z-<triple>/sccache
-          # → $dest/sccache directly so $dest is a clean PATH entry.
-          tar -xf "/tmp/${archive}" -C "$dest" --strip-components=1
-          echo "$dest" >> "$GITHUB_PATH"
-          sccache --version
-
       - name: fmt check
-        env:
-          RUSTC_WRAPPER: sccache
-          SCCACHE_GHA_ENABLED: "true"
         run: cargo fmt --all -- --check
 
       - name: clippy
         if: always()
-        env:
-          RUSTC_WRAPPER: sccache
-          SCCACHE_GHA_ENABLED: "true"
         run: cargo clippy --workspace --exclude vobes-desktop --all-targets -- -D warnings
 
       - name: test
         if: always()
-        env:
-          RUSTC_WRAPPER: sccache
-          SCCACHE_GHA_ENABLED: "true"
         run: cargo test --workspace --exclude vobes-desktop
 
       - name: build release (sanity)
         if: always()
-        env:
-          RUSTC_WRAPPER: sccache
-          SCCACHE_GHA_ENABLED: "true"
         run: cargo build --release -p vobes-cli
 
   desktop:
@@ -132,46 +92,12 @@ jobs:
         with:
           workspaces: "desktop/src-tauri -> target"
 
-      - name: install sccache
-        shell: bash
-        env:
-          SCCACHE_VERSION: "0.10.0"
-        run: |
-          set -e
-          case "$RUNNER_OS" in
-            Linux)
-              archive="sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz"
-              ;;
-            macOS)
-              archive="sccache-v${SCCACHE_VERSION}-aarch64-apple-darwin.tar.gz"
-              ;;
-            Windows)
-              archive="sccache-v${SCCACHE_VERSION}-x86_64-pc-windows-msvc.zip"
-              ;;
-          esac
-          url="https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/${archive}"
-          dest="/tmp/sccache-bin"
-          rm -rf "$dest"
-          mkdir -p "$dest"
-          curl -fsSL "$url" -o "/tmp/${archive}"
-          # tar --strip-components=1 flattens sccache-vX.Y.Z-<triple>/sccache
-          # → $dest/sccache directly so $dest is a clean PATH entry.
-          tar -xf "/tmp/${archive}" -C "$dest" --strip-components=1
-          echo "$dest" >> "$GITHUB_PATH"
-          sccache --version
-
       - name: build frontend
         working-directory: desktop
         run: pnpm build
 
       - name: clippy desktop
-        env:
-          RUSTC_WRAPPER: sccache
-          SCCACHE_GHA_ENABLED: "true"
         run: cargo clippy -p vobes-desktop --all-targets -- -D warnings
 
       - name: build desktop (debug)
-        env:
-          RUSTC_WRAPPER: sccache
-          SCCACHE_GHA_ENABLED: "true"
         run: cargo build -p vobes-desktop

@@ -133,6 +133,35 @@ cargo tauri dev        # hot-reload dev loop (frontend + rust)
 cargo tauri build      # produce installable bundle (in desktop/src-tauri/target/release/bundle)
 ```
 
+### Local sccache (optional)
+
+CI doesn't use sccache (the GitHub Actions cache backend needs `ACTIONS_CACHE_URL`
++ `ACTIONS_RUNTIME_TOKEN` which aren't always set, and `Swatinem/rust-cache`
+covers the practical wins for a single runner). For local rebuilds, sccache
+helps a lot:
+
+```bash
+# install
+brew install sccache          # macOS
+sudo apt install sccache      # Debian/Ubuntu
+cargo install sccache --locked # anywhere Rust is
+
+# enable per shell session
+export RUSTC_WRAPPER=sccache
+export SCCACHE_DIR=$HOME/.cache/sccache    # optional, defaults here
+```
+
+Or drop a `.cargo/config.toml` at the repo root to enable it project-wide for
+anyone with sccache installed:
+
+```toml
+[build]
+rustc-wrapper = "sccache"
+```
+
+(No such file is committed — adding it would break devs without sccache. The
+env-var approach above is the safer default.)
+
 ### Auto-update
 
 The updater is wired (`tauri-plugin-updater` + `createUpdaterArtifacts: true`,
