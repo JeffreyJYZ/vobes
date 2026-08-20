@@ -16,6 +16,7 @@
 		addSavedFilter,
 		density,
 		doScan,
+		doSync,
 		doReset,
 		lastRefreshed,
 		pushToast,
@@ -132,7 +133,10 @@
 				{$density === "comfy" ? "▦" : "☰"}
 			</button>
 			<button class="primary" on:click={doScan} disabled={$scanning}>
-				{$scanning ? "Scanning…" : "Scan"}
+				{$scanning ? "Scanning…" : "Discover"}
+			</button>
+			<button class="primary" on:click={doSync} disabled={$scanning}>
+				{$scanning ? "Scanning…" : "Refresh"}
 			</button>
 			<button
 				class="danger"

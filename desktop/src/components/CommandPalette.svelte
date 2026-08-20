@@ -63,13 +63,13 @@
 		},
 		{
 			id: "action.scan",
-			label: "Scan for new vobes",
+			label: "Discover new vobes",
 			hint: "⌘R",
 			run: doScan,
 		},
 		{
 			id: "action.sync",
-			label: "Sync git state",
+			label: "Refresh all vobes",
 			hint: "⌘S",
 			run: doSync,
 		},
