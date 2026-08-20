@@ -25,11 +25,13 @@ jobs:
         id: inspect
         run: |
           set -euo pipefail
-          # [release] marker forces a tag even when no version literal moved.
-          # Use for emergency re-tags or repo-only releases.
-          MSG=$(git log -1 --pretty=%B HEAD)
+          # [release] marker in the subject line forces a tag even when
+          # no version literal moved. Anchored on subject only — a body
+          # that mentions the marker (e.g. documenting the feature)
+          # must not trip it. Exact literal match; use [release] only.
+          SUBJECT=$(git log -1 --pretty=%s HEAD)
           MARKER=0
-          echo "$MSG" | grep -q '\[release' && MARKER=1 || true
+          echo "$SUBJECT" | grep -qF '[release]' && MARKER=1 || true
 
           # Desktop version is the tag (per AGENTS.md "tag only when desktop
           # version changed"). Read from the Rust Cargo.toml — the source of
