@@ -1,5 +1,7 @@
 # Vobes
 
+[![ci](https://github.com/JeffreyJYZ/vobes/actions/workflows/ci.yml/badge.svg)](https://github.com/JeffreyJYZ/vobes/actions/workflows/ci.yml)
+
 A developer command center.
 
 Vobes unifies fragmented developer context — git status, recent commits,
