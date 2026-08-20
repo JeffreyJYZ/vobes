@@ -1,0 +1,101 @@
+name: bump
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: read commit message + diff versions
+        id: inspect
+        run: |
+          set -euo pipefail
+          # [release] marker forces a tag even when no version literal moved.
+          # Use for emergency re-tags or repo-only releases.
+          MSG=$(git log -1 --pretty=%B HEAD)
+          MARKER=0
+          echo "$MSG" | grep -q '\[release' && MARKER=1 || true
+
+          # Desktop version is the tag (per AGENTS.md "tag only when desktop
+          # version changed"). Read from the Rust Cargo.toml — the source of
+          # truth for the binary.
+          NEW_DESKTOP=$(grep -E '^version' desktop/src-tauri/Cargo.toml \
+            | head -1 | sed -E 's/.*"([0-9.]+)".*/\1/')
+          OLD_DESKTOP=$(git show HEAD~1:desktop/src-tauri/Cargo.toml \
+            2>/dev/null | grep -E '^version' | head -1 \
+            | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
+
+          # Find every workspace crate whose version moved. Output format:
+          #   " name@version name@version ..."
+          BUMPED=""
+          for f in $(git diff --name-only HEAD~1 HEAD -- 'crates/*/Cargo.toml'); do
+            [ -f "$f" ] || continue
+            N=$(grep -E '^version' "$f" | head -1 | sed -E 's/.*"([0-9.]+)".*/\1/')
+            O=$(git show HEAD~1:"$f" 2>/dev/null \
+              | grep -E '^version' | head -1 \
+              | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
+            if [ -n "$O" ] && [ "$N" != "$O" ]; then
+              BUMPED="$BUMPED $(basename "$(dirname "$f")")@$N"
+            fi
+          done
+
+          DESKTOP_BUMPED=0
+          if [ -n "$OLD_DESKTOP" ] && [ "$NEW_DESKTOP" != "$OLD_DESKTOP" ]; then
+            DESKTOP_BUMPED=1
+          fi
+
+          echo "marker=$MARKER"                >> "$GITHUB_OUTPUT"
+          echo "desktop_version=$NEW_DESKTOP"  >> "$GITHUB_OUTPUT"
+          echo "desktop_bumped=$DESKTOP_BUMPED" >> "$GITHUB_OUTPUT"
+          echo "bumped_crates=$BUMPED"         >> "$GITHUB_OUTPUT"
+
+      - name: tag release
+        if: >
+          steps.inspect.outputs.desktop_bumped == '1' ||
+          steps.inspect.outputs.marker == '1'
+        env:
+          TAG: v${{ steps.inspect.outputs.desktop_version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Existing tag = error. Don't move tags — that's a footgun.
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists; refusing to move it."
+            exit 1
+          fi
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: publish CLI/MCP crates to crates.io
+        if: contains(steps.inspect.outputs.bumped_crates, '@')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Desktop publish path is the tag-driven tauri-action in
+          # release.yml. This step covers per-crate bumps that don't
+          # need a tag (CLI/MCP) — see AGENTS.md.
+          echo "Bumped:${{ steps.inspect.outputs.bumped_crates }}"
+          for spec in ${{ steps.inspect.outputs.bumped_crates }}; do
+            name=${spec%@*}
+            ver=${spec#*@}
+            [ "$name" = "vobes-desktop" ] && continue
+            echo "Publishing $name $ver…"
+            cargo publish -p "$name" --token "$CARGO_REGISTRY_TOKEN"
+          done
