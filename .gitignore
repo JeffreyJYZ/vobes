@@ -31,3 +31,6 @@ vite.config.ts.timestamp-*
 .env.*
 # Zed editor
 .zed/
+
+# Local-only scratch / planning (not for the repo)
+ignored/
