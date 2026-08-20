@@ -1,8 +1,8 @@
 # Vobes
 
 [![ci](https://github.com/JeffreyJYZ/vobes/actions/workflows/ci.yml/badge.svg)](https://github.com/JeffreyJYZ/vobes/actions/workflows/ci.yml)
-[![crates.io](https://img.shields.io/crates/v/vobes-cli.svg)](https://crates.io/crates/vobes-cli)
-[![GitHub release](https://img.shields.io/github/v/release/JeffreyJYZ/vobes.svg)](https://github.com/JeffreyJYZ/vobes/releases)
+[![cli: crates.io](https://img.shields.io/crates/v/vobes-cli.svg)](https://crates.io/crates/vobes-cli)
+[![desktop: GitHub release](https://img.shields.io/github/v/release/JeffreyJYZ/vobes.svg)](https://github.com/JeffreyJYZ/vobes/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/JeffreyJYZ/vobes/blob/main/LICENSE)
 
 A developer command center.
