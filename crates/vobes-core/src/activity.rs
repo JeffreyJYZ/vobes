@@ -22,8 +22,6 @@ pub enum ActivityKind {
     Scanned,
     /// First time tracked by Vobes.
     Created,
-    /// User explicitly closed (future).
-    Closed,
     /// User added/changed tags.
     Tagged,
     /// User edited notes.
@@ -39,7 +37,6 @@ impl ActivityKind {
             Self::Committed => "committed",
             Self::Scanned => "scanned",
             Self::Created => "created",
-            Self::Closed => "closed",
             Self::Tagged => "tagged",
             Self::Noted => "noted",
         }
@@ -105,12 +102,6 @@ impl ActivityEvent {
     /// Attach a detail string to the event.
     pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(detail.into());
-        self
-    }
-
-    /// Attach a storage-assigned id.
-    pub fn with_id(mut self, id: u64) -> Self {
-        self.id = Some(id);
         self
     }
 

@@ -2,10 +2,6 @@
 // and any future renaming happens in one place.
 
 import { invoke } from "@tauri-apps/api/core"
-import {
-	open as openExternal,
-	Command as ShellCommand,
-} from "@tauri-apps/plugin-shell"
 import type {
 	ActivityEvent,
 	Config,
@@ -83,12 +79,8 @@ export async function saveConfig(config: Config): Promise<ConfigDto> {
 	return invoke<ConfigDto>("save_config", { newConfig: config })
 }
 
-export async function openInTerminal(name: string): Promise<void> {
-	return invoke<void>("open_in_terminal", { name })
-}
-
-export async function openInTerminalWith(name: string, app: string): Promise<void> {
-	return invoke<void>("open_in_terminal", { name, app })
+export async function openInTerminal(name: string, app?: string): Promise<void> {
+	return invoke<void>("open_in_terminal", { name, app: app ?? null })
 }
 
 export async function listTerminals(): Promise<TerminalApp[]> {
@@ -116,10 +108,6 @@ export async function saveNotes(
 
 export async function setPinned(name: string, pinned: boolean): Promise<void> {
 	return invoke<void>("set_pinned", { name, pinned })
-}
-
-export async function getPinned(): Promise<string[]> {
-	return invoke<string[]>("get_pinned")
 }
 
 export async function setTags(name: string, tags: string[]): Promise<Vobe> {
@@ -180,24 +168,6 @@ export async function openUrlExternal(url: string): Promise<void> {
 	return invoke<void>("open_path_external", { path: url })
 }
 
-// Copy text to the OS clipboard. Uses the Tauri-injected `__TAURI__` writeText
-// if available, otherwise falls back to the browser API (works in WebView2).
 export async function copyText(text: string): Promise<void> {
-	try {
-		const w = window as unknown as {
-			__TAURI__?: {
-				clipboard?: { writeText: (s: string) => Promise<void> }
-			}
-		}
-		if (w.__TAURI__?.clipboard?.writeText) {
-			await w.__TAURI__.clipboard.writeText(text)
-			return
-		}
-	} catch {
-		// ignore
-	}
 	await navigator.clipboard.writeText(text)
 }
-
-// Re-export the shell opener for places that want to do their own thing.
-export { openExternal }

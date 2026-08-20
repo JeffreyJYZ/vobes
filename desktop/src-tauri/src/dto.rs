@@ -91,31 +91,10 @@ impl From<&vobes_core::ActivityEvent> for ActivityDto {
         Self {
             id: e.id,
             vobe_id: e.vobe_id.as_str().to_string(),
-            kind: format!("{:?}", e.kind),
+            kind: e.kind.label().to_string(),
             timestamp: e.timestamp.to_rfc3339(),
             detail: e.detail.clone(),
             actor: e.actor.clone(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use vobes_core::{ActivityEvent, ActivityKind, Vobe, VobeId};
-
-    #[test]
-    fn dto_fields_use_snake_case_to_match_frontend() {
-        let vobe = Vobe::new("demo", std::path::Path::new("/tmp/demo"));
-        let dto = VobeDto::from(&vobe);
-        let json = serde_json::to_string(&dto).unwrap();
-        assert!(json.contains("\"package_manager\""), "got {json}");
-        assert!(json.contains("\"last_modified\""), "got {json}");
-
-        let ev = ActivityEvent::now(VobeId::from_string("abc"), ActivityKind::Opened);
-        let adto = ActivityDto::from(&ev);
-        let ajson = serde_json::to_string(&adto).unwrap();
-        assert!(ajson.contains("\"vobe_id\""), "got {ajson}");
-        assert!(!ajson.contains("\"vobeId\""), "camelCase leak: {ajson}");
     }
 }

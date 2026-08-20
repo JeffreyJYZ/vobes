@@ -7,9 +7,6 @@
 # can't overwrite an installed release. `vbs init` writes a default
 # there for you.
 
-[general]
-name = "My Workspace"
-
 [scan]
 roots = ["~/dev", "~/work"]
 exclude = ["scratch", "experiments", "tmp"]
@@ -18,16 +15,6 @@ follow_symlinks = false
 
 [display]
 theme = "auto"
-date_format = "relative"
-default_sort = "last_modified"
-
-[git]
-cache_ttl_seconds = 60
-fetch_upstream = false
-
-[export]
-format = "json"
 
 [desktop]
 notify_behind = false
-launch_on_login = false

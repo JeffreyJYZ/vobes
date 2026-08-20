@@ -147,7 +147,6 @@ pub async fn sync(state: State<'_, Arc<DesktopCtx>>) -> Result<(usize, usize)> {
                 vobe.tags = prev.tags;
                 vobe.notes = prev.notes;
                 vobe.pinned = prev.pinned;
-                vobe.metadata = prev.metadata;
                 vobe.last_opened = prev.last_opened;
                 vobe.touch_modified();
                 state.store.upsert_vobe(&vobe)?;
@@ -175,18 +174,7 @@ pub async fn add_vobe(state: State<'_, Arc<DesktopCtx>>, path: String) -> Result
     if let Some(existing) = state.store.get_vobe_by_path(&abs)? {
         return Ok(VobeDto::from(&existing));
     }
-    let mut detection = vobes_scan::Detection::empty();
-    let detectors: Vec<Box<dyn vobes_scan::Detector>> = vec![
-        Box::new(vobes_scan::RepoDetector::new()),
-        Box::new(vobes_scan::LanguageDetector::new()),
-        Box::new(vobes_scan::PackageManagerDetector::new()),
-        Box::new(vobes_scan::FrameworkDetector::new()),
-    ];
-    for d in &detectors {
-        if let Ok(Some(det)) = d.detect(&abs) {
-            detection.merge(det);
-        }
-    }
+    let detection = state.scanner_snapshot().detect(&abs)?;
     let vobe = vobe_from_detection(&abs, &detection)?;
     state.store.upsert_vobe(&vobe)?;
     state.store.record_activity(

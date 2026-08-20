@@ -91,17 +91,7 @@ pub enum Command {
     /// Create a default `config.toml` in the user config directory.
     Init,
     /// Replace the running `vbs` binary with the latest release.
-    Update {
-        /// Print the comparison without downloading.
-        #[clap(long)]
-        check: bool,
-        /// Override the asset name (default: derived from host OS/arch).
-        #[clap(long)]
-        target: Option<String>,
-        /// Skip SHA256 verification of the downloaded asset.
-        #[clap(long)]
-        insecure: bool,
-    },
+    Update,
 }
 
 fn main() -> std::process::ExitCode {
@@ -151,10 +141,6 @@ fn dispatch(app: &vobes_cli::app::App, cmd: Command) -> vobes_core::Result<()> {
         Command::Reset { yes } => commands::reset::run(app, yes),
         Command::Export { out } => commands::export::run(app, out.as_deref()),
         Command::Init => commands::init::run(app),
-        Command::Update {
-            check,
-            target,
-            insecure,
-        } => commands::update::run(check, target.as_deref(), insecure),
+        Command::Update => commands::update::run(),
     }
 }

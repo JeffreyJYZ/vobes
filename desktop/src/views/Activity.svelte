@@ -2,7 +2,6 @@
 	import { relativeTime } from "../lib/format";
 	import {
 		activity,
-		kindLabel,
 		refresh,
 		scanning,
 		vobes,
@@ -95,7 +94,7 @@
 			<select bind:value={kindFilter}>
 				<option value="all">All</option>
 				{#each kinds as k (k)}
-					<option value={k}>{kindLabel(k)}</option>
+					<option value={k}>{k}</option>
 				{/each}
 			</select>
 		</label>
@@ -141,7 +140,7 @@
 							<span class="when">{relativeTime(e.timestamp)}</span
 							>
 							<span class="what">
-								<span class="verb">{kindLabel(e.kind)}</span>
+								<span class="verb">{e.kind}</span>
 								<span class="vobe"
 									>{vobeName(e.vobe_id, $vobes)}</span
 								>

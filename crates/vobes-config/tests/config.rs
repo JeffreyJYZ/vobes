@@ -9,11 +9,6 @@ fn empty_toml_uses_defaults() {
     assert_eq!(c.scan.max_depth, 4);
     assert!(!c.scan.follow_symlinks);
     assert_eq!(c.display.theme, "auto");
-    assert_eq!(c.display.date_format, "relative");
-    assert_eq!(c.display.default_sort, "last_modified");
-    assert_eq!(c.git.cache_ttl_seconds, 60);
-    assert!(!c.git.fetch_upstream);
-    assert_eq!(c.export.format, "json");
 }
 
 #[test]
@@ -24,7 +19,6 @@ max_depth = 8
 "#;
     let c = Config::from_toml_str(toml).unwrap();
     assert_eq!(c.scan.max_depth, 8);
-    // Other defaults remain
     assert!(!c.scan.follow_symlinks);
     assert_eq!(c.display.theme, "auto");
 }
@@ -53,16 +47,12 @@ fn load_from_existing_path_parses() {
     fs::write(
         &p,
         r#"
-[general]
-name = "Test"
-
 [scan]
 max_depth = 2
 "#,
     )
     .unwrap();
     let c = Config::load_from(&p).unwrap();
-    assert_eq!(c.general.name.as_deref(), Some("Test"));
     assert_eq!(c.scan.max_depth, 2);
     fs::remove_file(&p).ok();
     fs::remove_dir(&dir).ok();
@@ -77,9 +67,7 @@ roots = ["~/dev", "/abs/path"]
     let c = Config::from_toml_str(toml).unwrap();
     let roots = c.resolved_roots();
     assert_eq!(roots.len(), 2);
-    // First root expanded past `~`
     assert!(!roots[0].to_string_lossy().contains('~'));
-    // Absolute path kept as-is
     assert_eq!(roots[1].to_string_lossy(), "/abs/path");
 }
 
@@ -100,7 +88,6 @@ fn expand_home_handles_corner_cases() {
 fn desktop_section_defaults_to_off() {
     let c = Config::from_toml_str("").unwrap();
     assert!(!c.desktop.notify_behind);
-    assert!(!c.desktop.launch_on_login);
 }
 
 #[test]
@@ -108,20 +95,15 @@ fn desktop_section_parses_when_present() {
     let toml = r#"
 [desktop]
 notify_behind = true
-launch_on_login = true
 "#;
     let c = Config::from_toml_str(toml).unwrap();
     assert!(c.desktop.notify_behind);
-    assert!(c.desktop.launch_on_login);
 }
 
 #[test]
-fn export_section_rejects_stale_path_field() {
-    // We removed `export.path` — deny_unknown_fields should reject
-    // configs that still carry it (e.g. from an older `vbs init`).
+fn unknown_section_is_rejected() {
     let toml = r#"
 [export]
-path = "~/.vobes/snapshots"
 format = "json"
 "#;
     assert!(Config::from_toml_str(toml).is_err());

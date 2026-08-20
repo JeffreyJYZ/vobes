@@ -57,98 +57,7 @@ impl SqliteStore {
 
 impl Store for SqliteStore {
     fn upsert_vobe(&self, vobe: &Vobe) -> Result<()> {
-        self.with_conn(|conn| {
-            let tags = serde_json::to_string(&vobe.tags)
-                .map_err(|e| vobes_core::Error::storage(format!("encode tags: {e}")))?;
-            let metadata = serde_json::to_string(&vobe.metadata)
-                .map_err(|e| vobes_core::Error::storage(format!("encode metadata: {e}")))?;
-
-            let (
-                git_branch,
-                git_dirty,
-                git_ahead,
-                git_behind,
-                git_last_hash,
-                git_last_msg,
-                git_last_author,
-                git_last_date,
-            ) = match &vobe.git {
-                Some(g) => (
-                    Some(g.branch.as_str()),
-                    g.dirty as i64,
-                    g.ahead as i64,
-                    g.behind as i64,
-                    g.last_commit.as_ref().map(|c| c.hash.as_str()),
-                    g.last_commit.as_ref().map(|c| c.message.as_str()),
-                    g.last_commit.as_ref().map(|c| c.author.as_str()),
-                    g.last_commit.as_ref().map(|c| c.date.to_rfc3339()),
-                ),
-                None => (None, 0, 0, 0, None, None, None, None),
-            };
-
-            conn.execute(
-                "INSERT INTO vobes (
-                    id, name, path, framework, language, package_manager,
-                    created_at, last_opened, last_modified, tags, notes, metadata,
-                    git_branch, git_dirty, git_ahead, git_behind,
-                    git_last_hash, git_last_msg, git_last_author, git_last_date,
-                    refreshed_at, pinned
-                ) VALUES (
-                    ?1, ?2, ?3, ?4, ?5, ?6,
-                    ?7, ?8, ?9, ?10, ?11, ?12,
-                    ?13, ?14, ?15, ?16,
-                    ?17, ?18, ?19, ?20,
-                    ?21, ?22
-                )
-                ON CONFLICT(id) DO UPDATE SET
-                    name=excluded.name,
-                    path=excluded.path,
-                    framework=excluded.framework,
-                    language=excluded.language,
-                    package_manager=excluded.package_manager,
-                    last_opened=excluded.last_opened,
-                    last_modified=excluded.last_modified,
-                    tags=excluded.tags,
-                    notes=excluded.notes,
-                    metadata=excluded.metadata,
-                    git_branch=excluded.git_branch,
-                    git_dirty=excluded.git_dirty,
-                    git_ahead=excluded.git_ahead,
-                    git_behind=excluded.git_behind,
-                    git_last_hash=excluded.git_last_hash,
-                    git_last_msg=excluded.git_last_msg,
-                    git_last_author=excluded.git_last_author,
-                    git_last_date=excluded.git_last_date,
-                    refreshed_at=excluded.refreshed_at,
-                    pinned=excluded.pinned",
-                params![
-                    vobe.id.as_str(),
-                    vobe.name,
-                    vobes_core::normalize(&vobe.path).to_string_lossy(),
-                    vobe.framework,
-                    vobe.language,
-                    vobe.package_manager,
-                    vobe.created_at.to_rfc3339(),
-                    vobe.last_opened.map(|t| t.to_rfc3339()),
-                    vobe.last_modified.map(|t| t.to_rfc3339()),
-                    tags,
-                    vobe.notes,
-                    metadata,
-                    git_branch,
-                    git_dirty,
-                    git_ahead,
-                    git_behind,
-                    git_last_hash,
-                    git_last_msg,
-                    git_last_author,
-                    git_last_date,
-                    Utc::now().to_rfc3339(),
-                    vobe.pinned as i64,
-                ],
-            )
-            .map_err(|e| vobes_core::Error::storage(format!("upsert vobe: {e}")))?;
-            Ok(())
-        })
+        self.with_conn(|conn| upsert_vobe_tx(conn, vobe))
     }
 
     fn get_vobe(&self, id: &VobeId) -> Result<Option<Vobe>> {
@@ -230,9 +139,6 @@ impl Store for SqliteStore {
                 .map_err(|e| vobes_core::Error::storage(format!("purge activity: {e}")))?;
             conn.execute("DELETE FROM vobes", [])
                 .map_err(|e| vobes_core::Error::storage(format!("purge vobes: {e}")))?;
-            // Saved filters are user-authored views, not derived
-            // state — keep them across a reset so the user does not
-            // have to rebuild their sidebar after a rescan.
             Ok(())
         })
     }
@@ -287,11 +193,13 @@ impl Store for SqliteStore {
 
     fn record_activity(&self, event: &ActivityEvent) -> Result<()> {
         self.with_conn(|conn| {
+            let kind = serde_json::to_string(&event.kind)
+                .map_err(|e| vobes_core::Error::storage(format!("encode kind: {e}")))?;
             conn.execute(
                 "INSERT INTO activity (vobe_id, kind, timestamp, detail, actor) VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![
                     event.vobe_id.as_str(),
-                    kind_to_str(event.kind),
+                    kind,
                     event.timestamp.to_rfc3339(),
                     event.detail,
                     event.actor,
@@ -346,6 +254,9 @@ impl Store for SqliteStore {
         actor: Option<&str>,
         limit: usize,
     ) -> Result<Vec<ActivityEvent>> {
+        // Override the trait default because the in-memory filter
+        // (`recent_activity` then `retain`) would cap at `limit` before
+        // filtering, dropping per-actor results past the cap.
         self.with_conn(|conn| {
             let sql = if actor.is_some() {
                 "SELECT id, vobe_id, kind, timestamp, detail, actor FROM activity
@@ -384,18 +295,19 @@ impl Store for SqliteStore {
     fn import_json(&self, path: &Path) -> Result<()> {
         let snap = crate::json::import_from_file(path)?;
         self.with_conn(|conn| {
-            // Best-effort import — clean slate within a transaction.
             conn.execute_batch("BEGIN;")
                 .map_err(|e| vobes_core::Error::storage(format!("begin: {e}")))?;
             for v in &snap.vobes {
-                upsert_vobe_inline(conn, v)?;
+                upsert_vobe_tx(conn, v)?;
             }
             for e in &snap.activity {
+                let kind = serde_json::to_string(&e.kind)
+                    .map_err(|er| vobes_core::Error::storage(format!("encode kind: {er}")))?;
                 conn.execute(
                     "INSERT INTO activity (vobe_id, kind, timestamp, detail, actor) VALUES (?1, ?2, ?3, ?4, ?5)",
                     params![
                         e.vobe_id.as_str(),
-                        kind_to_str(e.kind),
+                        kind,
                         e.timestamp.to_rfc3339(),
                         e.detail,
                         e.actor,
@@ -410,11 +322,9 @@ impl Store for SqliteStore {
     }
 }
 
-fn upsert_vobe_inline(conn: &Connection, vobe: &Vobe) -> Result<()> {
+fn upsert_vobe_tx(conn: &Connection, vobe: &Vobe) -> Result<()> {
     let tags = serde_json::to_string(&vobe.tags)
         .map_err(|e| vobes_core::Error::storage(format!("encode tags: {e}")))?;
-    let metadata = serde_json::to_string(&vobe.metadata)
-        .map_err(|e| vobes_core::Error::storage(format!("encode metadata: {e}")))?;
     let (
         git_branch,
         git_dirty,
@@ -441,27 +351,37 @@ fn upsert_vobe_inline(conn: &Connection, vobe: &Vobe) -> Result<()> {
     conn.execute(
         "INSERT INTO vobes (
             id, name, path, framework, language, package_manager,
-            created_at, last_opened, last_modified, tags, notes, metadata,
+            created_at, last_opened, last_modified, tags, notes,
             git_branch, git_dirty, git_ahead, git_behind,
             git_last_hash, git_last_msg, git_last_author, git_last_date,
             refreshed_at, pinned
         ) VALUES (
             ?1, ?2, ?3, ?4, ?5, ?6,
-            ?7, ?8, ?9, ?10, ?11, ?12,
-            ?13, ?14, ?15, ?16,
-            ?17, ?18, ?19, ?20,
-            ?21, ?22
+            ?7, ?8, ?9, ?10, ?11,
+            ?12, ?13, ?14, ?15,
+            ?16, ?17, ?18, ?19,
+            ?20, ?21
         )
         ON CONFLICT(id) DO UPDATE SET
-            name=excluded.name, path=excluded.path, framework=excluded.framework,
-            language=excluded.language, package_manager=excluded.package_manager,
-            last_opened=excluded.last_opened, last_modified=excluded.last_modified,
-            tags=excluded.tags, notes=excluded.notes, metadata=excluded.metadata,
-            git_branch=excluded.git_branch, git_dirty=excluded.git_dirty,
-            git_ahead=excluded.git_ahead, git_behind=excluded.git_behind,
-            git_last_hash=excluded.git_last_hash, git_last_msg=excluded.git_last_msg,
-            git_last_author=excluded.git_last_author, git_last_date=excluded.git_last_date,
-            refreshed_at=excluded.refreshed_at, pinned=excluded.pinned",
+            name=excluded.name,
+            path=excluded.path,
+            framework=excluded.framework,
+            language=excluded.language,
+            package_manager=excluded.package_manager,
+            last_opened=excluded.last_opened,
+            last_modified=excluded.last_modified,
+            tags=excluded.tags,
+            notes=excluded.notes,
+            git_branch=excluded.git_branch,
+            git_dirty=excluded.git_dirty,
+            git_ahead=excluded.git_ahead,
+            git_behind=excluded.git_behind,
+            git_last_hash=excluded.git_last_hash,
+            git_last_msg=excluded.git_last_msg,
+            git_last_author=excluded.git_last_author,
+            git_last_date=excluded.git_last_date,
+            refreshed_at=excluded.refreshed_at,
+            pinned=excluded.pinned",
         params![
             vobe.id.as_str(),
             vobe.name,
@@ -474,7 +394,6 @@ fn upsert_vobe_inline(conn: &Connection, vobe: &Vobe) -> Result<()> {
             vobe.last_modified.map(|t| t.to_rfc3339()),
             tags,
             vobe.notes,
-            metadata,
             git_branch,
             git_dirty,
             git_ahead,
@@ -487,7 +406,7 @@ fn upsert_vobe_inline(conn: &Connection, vobe: &Vobe) -> Result<()> {
             vobe.pinned as i64,
         ],
     )
-    .map_err(|e| vobes_core::Error::storage(format!("import upsert: {e}")))?;
+    .map_err(|e| vobes_core::Error::storage(format!("upsert vobe: {e}")))?;
     Ok(())
 }
 
@@ -519,7 +438,6 @@ fn row_to_vobe(row: &rusqlite::Row<'_>) -> rusqlite::Result<Vobe> {
     let last_modified: Option<String> = row.get("last_modified")?;
     let tags_json: String = row.get("tags")?;
     let notes: Option<String> = row.get("notes")?;
-    let metadata_json: String = row.get("metadata")?;
     let git_branch: Option<String> = row.get("git_branch")?;
     let git_dirty: i64 = row.get("git_dirty")?;
     let git_ahead: i64 = row.get("git_ahead")?;
@@ -531,8 +449,6 @@ fn row_to_vobe(row: &rusqlite::Row<'_>) -> rusqlite::Result<Vobe> {
     let pinned: i64 = row.get("pinned").unwrap_or(0);
 
     let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
-    let metadata: std::collections::HashMap<String, serde_json::Value> =
-        serde_json::from_str(&metadata_json).unwrap_or_default();
 
     let last_commit = match (git_last_hash, git_last_msg, git_last_author, git_last_date) {
         (Some(hash), Some(message), Some(author), Some(date)) => {
@@ -582,22 +498,18 @@ fn row_to_vobe(row: &rusqlite::Row<'_>) -> rusqlite::Result<Vobe> {
         tags,
         notes,
         pinned: pinned != 0,
-        metadata,
     })
 }
 
 fn row_to_activity(row: &rusqlite::Row<'_>) -> rusqlite::Result<ActivityEvent> {
     let id: i64 = row.get("id")?;
     let vobe_id: String = row.get("vobe_id")?;
-    let kind: String = row.get("kind")?;
+    let kind_json: String = row.get("kind")?;
     let timestamp: String = row.get("timestamp")?;
     let detail: Option<String> = row.get("detail")?;
-    // Actor column was added in schema v3; older rows backfill to
-    // "human" via the DEFAULT clause, but be defensive in case a
-    // snapshot is imported against a conn that skipped migration.
     let actor: String = row.get("actor").unwrap_or_else(|_| "human".to_string());
 
-    let kind = kind_from_str(&kind);
+    let kind: ActivityKind = serde_json::from_str(&kind_json).unwrap_or(ActivityKind::Scanned);
     let timestamp = DateTime::parse_from_rfc3339(&timestamp)
         .ok()
         .map(|d| d.with_timezone(&Utc))
@@ -628,31 +540,4 @@ fn row_to_saved_filter(row: &rusqlite::Row<'_>) -> rusqlite::Result<SavedFilter>
         query,
         created_at,
     })
-}
-
-fn kind_to_str(k: ActivityKind) -> &'static str {
-    match k {
-        ActivityKind::Opened => "Opened",
-        ActivityKind::Modified => "Modified",
-        ActivityKind::Committed => "Committed",
-        ActivityKind::Scanned => "Scanned",
-        ActivityKind::Created => "Created",
-        ActivityKind::Closed => "Closed",
-        ActivityKind::Tagged => "Tagged",
-        ActivityKind::Noted => "Noted",
-    }
-}
-
-fn kind_from_str(s: &str) -> ActivityKind {
-    match s {
-        "Opened" => ActivityKind::Opened,
-        "Modified" => ActivityKind::Modified,
-        "Committed" => ActivityKind::Committed,
-        "Scanned" => ActivityKind::Scanned,
-        "Created" => ActivityKind::Created,
-        "Closed" => ActivityKind::Closed,
-        "Tagged" => ActivityKind::Tagged,
-        "Noted" => ActivityKind::Noted,
-        _ => ActivityKind::Scanned,
-    }
 }

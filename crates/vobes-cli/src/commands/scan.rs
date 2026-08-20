@@ -1,7 +1,5 @@
 //! `vbs scan` — discover projects in configured roots.
 
-use std::collections::HashSet;
-
 use vobes_core::{ActivityEvent, ActivityKind, Result};
 
 use crate::commands::shared::{absolute_normalized, vobe_from_detection};
@@ -21,9 +19,6 @@ pub fn run(app: &App) -> Result<()> {
     }
 
     let mut found = 0usize;
-    let mut new_ids: HashSet<String> = HashSet::new();
-    let mut total_dirs_skipped = 0usize;
-    let mut total_dirs_walked = 0usize;
     let bar = indicatif::ProgressBar::new(roots.len() as u64);
 
     for root in &roots {
@@ -42,7 +37,6 @@ pub fn run(app: &App) -> Result<()> {
             }
             let mut vobe = vobe_from_detection(&path, &detection)?;
             app.store.upsert_vobe(&vobe)?;
-            new_ids.insert(vobe.id.as_str().to_string());
             app.store.record_activity(
                 &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Scanned)
                     .with_detail("vbs scan"),
@@ -51,8 +45,6 @@ pub fn run(app: &App) -> Result<()> {
             found += 1;
             bar.println(format!("  + {} ({})", vobe.name, vobe.path.display()));
         }
-        let _ = &mut total_dirs_skipped;
-        let _ = &mut total_dirs_walked;
         bar.inc(1);
     }
     bar.finish_and_clear();

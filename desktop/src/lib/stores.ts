@@ -27,30 +27,6 @@ export const activity = writable<ActivityEvent[]>([])
 export const lastRefreshed = writable<number>(0)
 export const scanning = writable<boolean>(false)
 
-/** A short human label for activity `kind` strings coming from Rust. */
-export function kindLabel(k: string): string {
-	switch (k) {
-		case "Opened":
-			return "opened"
-		case "Modified":
-			return "modified"
-		case "Committed":
-			return "committed"
-		case "Scanned":
-			return "scanned"
-		case "Created":
-			return "created"
-		case "Closed":
-			return "closed"
-		case "Tagged":
-			return "tagged"
-		case "Noted":
-			return "noted"
-		default:
-			return k.toLowerCase()
-	}
-}
-
 export async function refresh(opts: { silent?: boolean } = {}): Promise<void> {
 	if (get(scanning)) return
 	if (!opts.silent) scanning.set(true)
@@ -446,18 +422,7 @@ export function sortVobe(a: Vobe, b: Vobe, key: SortKey): number {
 }
 
 export function errorString(e: unknown): string {
-	if (!e) return "Unknown error"
-	if (typeof e === "string") return e
-	if (typeof e === "object") {
-		const obj = e as Record<string, unknown>
-		if (typeof obj.message === "string") return obj.message
-		if (typeof obj.msg === "string") return obj.msg
-		try {
-			return JSON.stringify(e)
-		} catch {
-			return String(e)
-		}
-	}
+	if (e instanceof Error) return e.message
 	return String(e)
 }
 
@@ -589,10 +554,4 @@ export async function removeSavedFilter(id: string): Promise<void> {
 		console.warn("removeSavedFilter backend call failed:", e)
 	}
 	savedFilters.update((arr) => arr.filter((f) => f.id !== id))
-}
-
-// Convenience sync writer for callers that already have the dto in
-// hand and do not need to await the IPC round-trip.
-export function setSavedFilters(arr: SavedFilter[]): void {
-	savedFilters.set(arr)
 }

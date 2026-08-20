@@ -5874,15 +5874,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
-name = "vobes-activity"
-version = "0.1.5"
-dependencies = [
- "thiserror 1.0.69",
- "tracing",
- "vobes-core",
-]
-
-[[package]]
 name = "vobes-cli"
 version = "0.1.5"
 dependencies = [
@@ -5895,9 +5886,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "tracing",
  "tracing-subscriber",
- "vobes-activity",
  "vobes-config",
  "vobes-core",
  "vobes-git",
@@ -5913,7 +5902,6 @@ dependencies = [
  "serde",
  "thiserror 1.0.69",
  "toml 0.8.2",
- "tracing",
 ]
 
 [[package]]
@@ -5933,7 +5921,6 @@ dependencies = [
  "chrono",
  "notify",
  "notify-debouncer-mini",
- "once_cell",
  "sentry",
  "serde",
  "serde_json",
@@ -5962,7 +5949,6 @@ dependencies = [
  "chrono",
  "git2",
  "thiserror 1.0.69",
- "tracing",
  "vobes-core",
 ]
 
@@ -5982,13 +5968,10 @@ dependencies = [
 name = "vobes-scan"
 version = "0.1.5"
 dependencies = [
- "once_cell",
  "rayon",
- "regex",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "tracing",
  "vobes-core",
  "walkdir",
 ]
@@ -6002,7 +5985,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "tracing",
  "vobes-config",
  "vobes-core",
 ]

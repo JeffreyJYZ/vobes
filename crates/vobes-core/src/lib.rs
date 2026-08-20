@@ -10,7 +10,6 @@ pub mod activity;
 pub mod error;
 pub mod git;
 pub mod path;
-pub mod plugins;
 pub mod vobe;
 
 pub use activity::{actor_from_env, default_actor, ActivityEvent, ActivityKind};

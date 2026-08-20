@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use vobes_core::Result;
 
 /// Current schema version. Increment when migrations are added.
-pub const SCHEMA_VERSION: u32 = 4;
+pub const SCHEMA_VERSION: u32 = 5;
 
 /// Initial schema. Creates all tables and indexes for v1.
 pub const SCHEMA_V1: &str = r#"
@@ -76,6 +76,18 @@ CREATE TABLE IF NOT EXISTS saved_filters (
 CREATE INDEX IF NOT EXISTS idx_saved_filters_created ON saved_filters(created_at DESC);
 "#;
 
+/// Migration to v5: re-encode `activity.kind` from bare PascalCase
+/// (e.g. `Opened`) to JSON (e.g. `"Opened"`) so serde can deserialize
+/// it as `ActivityKind`. The `metadata` column on vobes is left in
+/// place — it is no longer read or written by Vobes, but pre-v5 DBs
+/// carry user data there and SQLite ALTER cannot drop a column
+/// without a table rebuild.
+pub const MIGRATION_V4_TO_V5: &str = r#"
+UPDATE activity
+   SET kind = '"' || kind || '"'
+ WHERE substr(kind, 1, 1) != '"';
+"#;
+
 /// Apply migrations to a fresh or existing connection.
 pub fn migrate(conn: &Connection) -> Result<()> {
     conn.execute_batch(SCHEMA_V1)
@@ -98,6 +110,10 @@ pub fn migrate(conn: &Connection) -> Result<()> {
     if current < 4 {
         conn.execute_batch(MIGRATION_V3_TO_V4)
             .map_err(|e| vobes_core::Error::storage(format!("migrate v4: {e}")))?;
+    }
+    if current < 5 {
+        conn.execute_batch(MIGRATION_V4_TO_V5)
+            .map_err(|e| vobes_core::Error::storage(format!("migrate v5: {e}")))?;
     }
     conn.execute(
         "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",

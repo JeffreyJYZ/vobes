@@ -1,10 +1,8 @@
 //! Vobe model — one software project.
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
-use serde_json::Value;
 
 use crate::error::VobeId;
 use crate::git::GitInfo;
@@ -13,9 +11,6 @@ use crate::git::GitInfo;
 pub const ARCHIVED_TAG: &str = "archived";
 
 /// One software project managed by Vobes.
-///
-/// Extensible via `metadata`: Vobes treats it as opaque, users and
-/// future agents can store anything there.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Vobe {
     /// Stable internal id (never reused, survives renames).
@@ -53,9 +48,6 @@ pub struct Vobe {
     /// Whether the user pinned this vobe (always shown first).
     #[serde(default)]
     pub pinned: bool,
-    /// Custom, extensible fields. Opaque to Vobes.
-    #[serde(default)]
-    pub metadata: HashMap<String, Value>,
 }
 
 impl Vobe {
@@ -76,37 +68,12 @@ impl Vobe {
             tags: Vec::new(),
             notes: None,
             pinned: false,
-            metadata: HashMap::new(),
         }
     }
 
     /// Set the git state.
     pub fn with_git(mut self, git: GitInfo) -> Self {
         self.git = Some(git);
-        self
-    }
-
-    /// Set the framework.
-    pub fn with_framework(mut self, framework: impl Into<String>) -> Self {
-        self.framework = Some(framework.into());
-        self
-    }
-
-    /// Set the language.
-    pub fn with_language(mut self, language: impl Into<String>) -> Self {
-        self.language = Some(language.into());
-        self
-    }
-
-    /// Set the package manager.
-    pub fn with_package_manager(mut self, package_manager: impl Into<String>) -> Self {
-        self.package_manager = Some(package_manager.into());
-        self
-    }
-
-    /// Set the notes content.
-    pub fn with_notes(mut self, notes: impl Into<String>) -> Self {
-        self.notes = Some(notes.into());
         self
     }
 
@@ -161,16 +128,6 @@ impl Vobe {
     /// Mark the vobe as modified now.
     pub fn touch_modified(&mut self) {
         self.last_modified = Some(Utc::now());
-    }
-
-    /// Store a custom metadata field.
-    pub fn set_metadata(&mut self, key: impl Into<String>, value: Value) {
-        self.metadata.insert(key.into(), value);
-    }
-
-    /// Read a custom metadata field.
-    pub fn get_metadata(&self, key: &str) -> Option<&Value> {
-        self.metadata.get(key)
     }
 }
 

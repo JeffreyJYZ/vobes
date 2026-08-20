@@ -8,9 +8,6 @@ use vobes_cli::app::App;
 
 const DEFAULT_CONFIG: &str = r#"# Vobes configuration. Edit and rerun `vbs scan`.
 
-[general]
-name = "Personal Workspace"
-
 [scan]
 roots = ["~/dev", "~/work"]
 exclude = ["scratch", "experiments", "tmp"]
@@ -19,19 +16,9 @@ follow_symlinks = false
 
 [display]
 theme = "auto"
-date_format = "relative"
-default_sort = "last_modified"
-
-[git]
-cache_ttl_seconds = 60
-fetch_upstream = false
-
-[export]
-format = "json"
 
 [desktop]
 notify_behind = false
-launch_on_login = false
 "#;
 
 pub fn run(app: &App) -> Result<()> {

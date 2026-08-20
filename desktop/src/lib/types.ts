@@ -40,10 +40,6 @@ export type ActivityEvent = {
 	actor: string
 }
 
-export type GeneralConfig = {
-	name: string | null
-}
-
 export type ScanConfig = {
 	roots: string[]
 	exclude: string[]
@@ -53,31 +49,16 @@ export type ScanConfig = {
 
 export type DisplayConfig = {
 	theme: "auto" | "light" | "dark"
-	date_format: "relative" | "absolute"
-	default_sort: "last_modified" | "name" | "last_opened" | "created_at"
-}
-
-export type GitConfig = {
-	cache_ttl_seconds: number
-	fetch_upstream: boolean
-}
-
-export type ExportConfig = {
-	format: string
 }
 
 export type Config = {
-	general: GeneralConfig
 	scan: ScanConfig
 	display: DisplayConfig
-	git: GitConfig
-	export: ExportConfig
 	desktop: DesktopConfig
 }
 
 export type DesktopConfig = {
 	notify_behind: boolean
-	launch_on_login: boolean
 }
 
 export type Paths = {

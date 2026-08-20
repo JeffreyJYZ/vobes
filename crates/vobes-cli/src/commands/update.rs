@@ -26,7 +26,7 @@ const MANAGED: &[(&str, &str, &str)] = &[
     ("/snap/", "snap", "sudo snap refresh vobes-cli"),
 ];
 
-pub fn run(_check: bool, _target: Option<&str>, _insecure: bool) -> Result<()> {
+pub fn run() -> Result<()> {
     let current = std::env::current_exe()
         .map_err(|e| vobes_core::Error::internal(format!("locate current binary: {e}")))?;
     let local = env!("CARGO_PKG_VERSION").to_string();

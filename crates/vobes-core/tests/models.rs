@@ -5,7 +5,6 @@
 //! exercised by their owning crates.
 
 use chrono::Utc;
-use serde_json::json;
 use vobes_core::{ActivityEvent, ActivityKind};
 use vobes_core::{Commit, GitInfo, Vobe, VobeId};
 
@@ -63,24 +62,10 @@ fn vobe_new_has_defaults() {
     assert!(v.last_modified.is_none());
     assert!(v.notes.is_none());
     assert!(v.tags.is_empty());
-    assert!(v.metadata.is_empty());
     assert!(!v.is_dirty());
     assert!(!v.has_unpushed());
     assert!(!v.has_unpulled());
     assert!(!v.is_archived());
-}
-
-#[test]
-fn vobe_builder_chains() {
-    let v = Vobe::new("demo", "/tmp/demo")
-        .with_language("Rust")
-        .with_framework("Tauri")
-        .with_package_manager("cargo")
-        .with_notes("hello");
-    assert_eq!(v.language.as_deref(), Some("Rust"));
-    assert_eq!(v.framework.as_deref(), Some("Tauri"));
-    assert_eq!(v.package_manager.as_deref(), Some("cargo"));
-    assert_eq!(v.notes.as_deref(), Some("hello"));
 }
 
 #[test]
@@ -107,22 +92,11 @@ fn vobe_touch_helpers_set_timestamps() {
 }
 
 #[test]
-fn vobe_metadata_round_trip() {
-    let mut v = Vobe::new("demo", "/tmp/demo");
-    v.set_metadata("upstream", json!("git@github.com:foo/bar.git"));
-    assert_eq!(
-        v.get_metadata("upstream"),
-        Some(&json!("git@github.com:foo/bar.git"))
-    );
-    assert_eq!(v.get_metadata("missing"), None);
-}
-
-#[test]
 fn vobe_serde_roundtrip_preserves_fields() {
-    let v = Vobe::new("demo", "/tmp/demo")
-        .with_language("TypeScript")
-        .with_framework("Next.js")
-        .with_package_manager("pnpm");
+    let mut v = Vobe::new("demo", "/tmp/demo");
+    v.language = Some("TypeScript".into());
+    v.framework = Some("Next.js".into());
+    v.package_manager = Some("pnpm".into());
     let s = serde_json::to_string(&v).unwrap();
     let back: Vobe = serde_json::from_str(&s).unwrap();
     assert_eq!(v, back);
@@ -195,7 +169,6 @@ fn activity_kind_serde_roundtrip() {
         ActivityKind::Committed,
         ActivityKind::Scanned,
         ActivityKind::Created,
-        ActivityKind::Closed,
         ActivityKind::Tagged,
         ActivityKind::Noted,
     ];
@@ -214,7 +187,4 @@ fn activity_event_builder() {
     assert_eq!(ev.kind, ActivityKind::Opened);
     assert_eq!(ev.detail.as_deref(), Some("via vbs"));
     assert!(ev.id.is_none());
-
-    let with_id = ev.with_id(42);
-    assert_eq!(with_id.id, Some(42));
 }

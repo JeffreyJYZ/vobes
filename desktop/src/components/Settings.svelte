@@ -282,44 +282,6 @@ async function restore(s: SnapshotInfo) {
 						<option value="dark">Dark</option>
 					</select>
 				</label>
-				<label>
-					<span>Date format</span>
-					<select bind:value={draft.display.date_format}>
-						<option value="relative">Relative (3h ago)</option>
-						<option value="absolute">Absolute (3:14pm)</option>
-					</select>
-				</label>
-				<label>
-					<span>Default sort</span>
-					<select bind:value={draft.display.default_sort}>
-						<option value="last_modified">Last modified</option>
-						<option value="last_opened">Last opened</option>
-						<option value="name">Name</option>
-						<option value="created_at">Created</option>
-					</select>
-				</label>
-			</div>
-		</section>
-
-		<section class="block">
-			<h3>Git</h3>
-			<div class="grid">
-				<label>
-					<span>Cache TTL (seconds)</span>
-					<input
-						type="number"
-						min="0"
-						step="5"
-						bind:value={draft.git.cache_ttl_seconds}
-					/>
-				</label>
-				<label class="check">
-					<input
-						type="checkbox"
-						bind:checked={draft.git.fetch_upstream}
-					/>
-					Fetch upstream on sync
-				</label>
 			</div>
 		</section>
 
@@ -398,13 +360,6 @@ async function restore(s: SnapshotInfo) {
 						bind:checked={draft.desktop.notify_behind}
 					/>
 					Notify when a vobe is behind upstream
-				</label>
-				<label class="check">
-					<input
-						type="checkbox"
-						bind:checked={draft.desktop.launch_on_login}
-					/>
-					Launch Vobes on system login
 				</label>
 			</div>
 		</section>

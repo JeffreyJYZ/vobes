@@ -28,7 +28,6 @@
 		vobes,
 	} from "./lib/stores";
 	import { addVobe } from "./lib/api";
-	import { checkForUpdate } from "./lib/updates";
 	import Activity from "./views/Activity.svelte";
 	import Dashboard from "./views/Dashboard.svelte";
 	import Projects from "./views/Projects.svelte";
@@ -81,10 +80,6 @@
 		await refresh();
 		await loadSavedFilters();
 		booted = true;
-
-		// Check for app updates in the background. Surface as a
-		// toast with an action button — the user always opts in.
-		void checkForUpdate();
 
 		// Auto-refresh on window focus. We deliberately throttle to once per
 		// 15s so a fast tab-switch doesn't hammer the disk.

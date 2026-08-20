@@ -95,6 +95,16 @@ impl Scanner for DefaultScanner {
     fn scan(&self, root: &Path) -> Result<Vec<(PathBuf, Detection)>> {
         Ok(self.scan_report(root)?.vobes)
     }
+
+    fn detect(&self, path: &Path) -> Result<Detection> {
+        let mut merged = Detection::empty();
+        for d in self.detectors.iter() {
+            if let Ok(Some(det)) = d.detect(path) {
+                merged.merge(det);
+            }
+        }
+        Ok(merged)
+    }
 }
 
 impl DefaultScanner {

@@ -25,7 +25,6 @@ pub fn run(app: &App) -> Result<()> {
                 vobe.created_at = prev.created_at;
                 vobe.tags = prev.tags;
                 vobe.notes = prev.notes;
-                vobe.metadata = prev.metadata;
                 vobe.last_opened = prev.last_opened;
                 vobe.touch_modified();
                 app.store.upsert_vobe(&vobe)?;

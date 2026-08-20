@@ -158,7 +158,7 @@
 		busy = true;
 		try {
 			await api.markOpened(v.name);
-			await api.openInTerminalWith(v.name, selectedTerminal ?? "");
+			await api.openInTerminal(v.name, selectedTerminal ?? "");
 			pushToast({ kind: "success", message: `Terminal at ${v.name}.` });
 		} catch (e) {
 			pushToast({ kind: "error", message: errorString(e) });

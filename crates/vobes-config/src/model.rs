@@ -8,16 +8,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
-    /// General workspace settings.
-    pub general: GeneralConfig,
     /// Scanner settings.
     pub scan: ScanConfig,
     /// Display settings.
     pub display: DisplayConfig,
-    /// Git settings.
-    pub git: GitConfig,
-    /// Export settings.
-    pub export: ExportConfig,
     /// Desktop-specific preferences (ignored by the CLI).
     pub desktop: DesktopConfig,
 }
@@ -30,16 +24,6 @@ pub struct Config {
 pub struct DesktopConfig {
     /// Surface an OS notification when a vobe is behind upstream.
     pub notify_behind: bool,
-    /// Launch Vobes when the user logs in.
-    pub launch_on_login: bool,
-}
-
-/// General workspace metadata.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct GeneralConfig {
-    /// Human-friendly workspace name.
-    pub name: Option<String>,
 }
 
 /// Scanner settings.
@@ -73,53 +57,12 @@ impl Default for ScanConfig {
 pub struct DisplayConfig {
     /// `"auto"`, `"light"`, `"dark"`.
     pub theme: String,
-    /// `"relative"` (e.g., "3 hours ago") or `"absolute"`.
-    pub date_format: String,
-    /// Default sort field: `"last_modified"`, `"name"`, `"last_opened"`, `"created_at"`.
-    pub default_sort: String,
 }
 
 impl Default for DisplayConfig {
     fn default() -> Self {
         Self {
             theme: "auto".to_string(),
-            date_format: "relative".to_string(),
-            default_sort: "last_modified".to_string(),
-        }
-    }
-}
-
-/// Git settings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct GitConfig {
-    /// How long cached git state is considered fresh, in seconds.
-    pub cache_ttl_seconds: u64,
-    /// Whether to auto-fetch upstream on sync.
-    pub fetch_upstream: bool,
-}
-
-impl Default for GitConfig {
-    fn default() -> Self {
-        Self {
-            cache_ttl_seconds: 60,
-            fetch_upstream: false,
-        }
-    }
-}
-
-/// Export settings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct ExportConfig {
-    /// Export format. Currently `"json"`.
-    pub format: String,
-}
-
-impl Default for ExportConfig {
-    fn default() -> Self {
-        Self {
-            format: "json".to_string(),
         }
     }
 }

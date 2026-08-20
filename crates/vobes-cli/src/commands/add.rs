@@ -17,20 +17,7 @@ pub fn run(app: &App, path: &str) -> Result<()> {
         return Ok(());
     }
 
-    // Run detectors on the path
-    let mut detection = vobes_scan::Detection::empty();
-    let detectors: Vec<Box<dyn vobes_scan::Detector>> = vec![
-        Box::new(vobes_scan::RepoDetector::new()),
-        Box::new(vobes_scan::LanguageDetector::new()),
-        Box::new(vobes_scan::PackageManagerDetector::new()),
-        Box::new(vobes_scan::FrameworkDetector::new()),
-    ];
-    for d in &detectors {
-        if let Ok(Some(det)) = d.detect(&abs) {
-            detection.merge(det);
-        }
-    }
-
+    let detection = app.scanner.detect(&abs)?;
     let vobe = vobe_from_detection(&abs, &detection)?;
     app.store.upsert_vobe(&vobe)?;
     app.store.record_activity(
