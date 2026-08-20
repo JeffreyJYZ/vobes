@@ -50,4 +50,17 @@ impl App {
             config_path: cfg_path,
         })
     }
+
+    /// Construct an `App` for tests with explicit dependencies. Bypasses
+    /// `dirs::config_dir()` so tests in other crates don't touch the
+    /// user's real state dir. Production code uses [`App::load`].
+    #[doc(hidden)]
+    pub fn for_test(store: Arc<dyn Store>) -> Self {
+        Self {
+            config: Config::default(),
+            store,
+            scanner: Arc::new(DefaultScanner::with_standard_detectors()),
+            config_path: None,
+        }
+    }
 }

@@ -98,3 +98,59 @@ impl From<&vobes_core::ActivityEvent> for ActivityDto {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vobes_core::{ActivityEvent, ActivityKind, Vobe, VobeId};
+
+    #[test]
+    fn snake_case_field_names_match_frontend_types() {
+        // The frontend types in desktop/src/lib/types.ts mirror these
+        // field names. A silent rename here breaks the UI without a
+        // compile error — pin the names so a stray camelCase is loud.
+        let vobe = Vobe::new("demo", std::path::Path::new("/tmp/demo"));
+        let v_json = serde_json::to_string(&VobeDto::from(&vobe)).unwrap();
+        for k in [
+            "package_manager",
+            "last_modified",
+            "last_opened",
+            "created_at",
+            "git",
+            "pinned",
+        ] {
+            assert!(
+                v_json.contains(&format!("\"{k}\"")),
+                "VobeDto missing snake_case field {k}: {v_json}"
+            );
+        }
+
+        let ev = ActivityEvent::now(VobeId::from_string("abc"), ActivityKind::Opened);
+        let a_json = serde_json::to_string(&ActivityDto::from(&ev)).unwrap();
+        for k in ["vobe_id", "kind", "timestamp", "actor"] {
+            assert!(
+                a_json.contains(&format!("\"{k}\"")),
+                "ActivityDto missing snake_case field {k}: {a_json}"
+            );
+        }
+        // kind is the lowercase human label, not the PascalCase variant.
+        assert!(a_json.contains("\"opened\""), "got {a_json}");
+    }
+
+    #[test]
+    fn activity_kind_label_is_human_readable() {
+        // The frontend renders e.kind directly. If the DTO started
+        // sending debug-formatted variants, the activity feed would
+        // show "Opened" instead of "opened".
+        for (kind, label) in [
+            (ActivityKind::Opened, "opened"),
+            (ActivityKind::Scanned, "scanned"),
+            (ActivityKind::Created, "created"),
+            (ActivityKind::Tagged, "tagged"),
+        ] {
+            let ev = ActivityEvent::now(VobeId::from_string("x"), kind);
+            let dto = ActivityDto::from(&ev);
+            assert_eq!(dto.kind, label);
+        }
+    }
+}

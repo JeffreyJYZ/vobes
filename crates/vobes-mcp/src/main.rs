@@ -270,3 +270,89 @@ fn arg_str(args: &Value, key: &str) -> Result<String, String> {
 fn serialize<T: serde::Serialize>(v: &T) -> Result<String, String> {
     serde_json::to_string_pretty(v).map_err(|e| e.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vobes_cli::app::App;
+    use vobes_store::SqliteStore;
+
+    fn app() -> App {
+        App::for_test(std::sync::Arc::new(SqliteStore::open_in_memory().unwrap()))
+    }
+
+    fn req(method: &str, id: u64, params: Value) -> Value {
+        json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": method,
+            "params": params,
+        })
+    }
+
+    #[test]
+    fn initialize_returns_server_info_and_protocol_version() {
+        let resp = handle(&app(), &req("initialize", 1, json!({}))).expect("response");
+        let result = resp.get("result").expect("result");
+        assert_eq!(resp.get("jsonrpc").unwrap(), "2.0");
+        assert_eq!(result.get("serverInfo").unwrap()["name"], "vobes");
+        assert_eq!(result.get("protocolVersion").unwrap(), "2024-11-05");
+    }
+
+    #[test]
+    fn tools_list_advertises_five_tools() {
+        let resp = handle(&app(), &req("tools/list", 2, json!({}))).expect("response");
+        let tools = resp["result"]["tools"].as_array().expect("array");
+        let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+        for expected in [
+            "vobes_list",
+            "vobes_show",
+            "vobes_search",
+            "vobes_recent_activity",
+            "vobes_context",
+        ] {
+            assert!(
+                names.contains(&expected),
+                "missing tool {expected}: {names:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_method_returns_jsonrpc_error() {
+        let resp = handle(&app(), &req("tools/typo", 3, json!({}))).expect("response");
+        let err = resp.get("error").expect("error object");
+        assert_eq!(err["code"], -32601);
+        assert!(err["message"].as_str().unwrap().contains("tools/typo"));
+    }
+
+    #[test]
+    fn notification_yields_no_response() {
+        // Initialized notifications carry no id — server should not reply.
+        let resp = handle(
+            &app(),
+            &json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
+        );
+        assert!(resp.is_none(), "notification must not produce a response");
+    }
+
+    #[test]
+    fn tool_call_unknown_tool_surfaces_error_in_payload() {
+        let resp = handle(
+            &app(),
+            &req(
+                "tools/call",
+                4,
+                json!({"name": "vobes_nope", "arguments": {}}),
+            ),
+        )
+        .expect("response");
+        // Tool-call errors come back as a result with isError: true, not
+        // as a JSON-RPC error object — that's how MCP clients expect them.
+        assert_eq!(resp["result"]["isError"], true);
+        assert!(resp["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("vobes_nope"));
+    }
+}
