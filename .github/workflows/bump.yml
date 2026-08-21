@@ -76,10 +76,13 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Existing tag = error. Don't move tags — that's a footgun.
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "::error::Tag $TAG already exists; refusing to move it."
-            exit 1
+          # Check the remote, not local — `git rev-parse` only sees
+          # the shallow clone's tags, which never include pre-existing
+          # remote ones. Skip silently if already there; only fail on
+          # a real push problem.
+          if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
+            echo "::notice::Tag $TAG already exists on origin; skipping."
+            exit 0
           fi
           git tag "$TAG"
           git push origin "$TAG"
