@@ -24,7 +24,7 @@ default-members = [
 [workspace.package]
 edition = "2021"
 authors = ["Yizhou Jiang"]
-license = "MIT"
+license = "Apache-2.0"
 repository = "https://github.com/jeffreyjyz/vobes"
 homepage = "https://jyz.land/vobes"
 description = "Developer command center — unify projects, git, and activity."

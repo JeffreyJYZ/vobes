@@ -3,7 +3,7 @@
 [![ci](https://github.com/JeffreyJYZ/vobes/actions/workflows/ci.yml/badge.svg)](https://github.com/JeffreyJYZ/vobes/actions/workflows/ci.yml)
 [![cli](https://img.shields.io/crates/v/vobes-cli.svg?label=cli)](https://crates.io/crates/vobes-cli)
 [![desktop](https://img.shields.io/github/v/release/JeffreyJYZ/vobes.svg?label=desktop)](https://github.com/JeffreyJYZ/vobes/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/JeffreyJYZ/vobes/blob/main/LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://github.com/JeffreyJYZ/vobes/blob/main/LICENSE)
 
 A developer command center.
 
@@ -287,4 +287,4 @@ follow-up work, not a permanent split.
 
 ## License
 
-MIT — (c) Yizhou Jiang
+Apache-2.0 — (c) 2026 Yizhou Jiang
