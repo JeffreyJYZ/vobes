@@ -1,6 +1,7 @@
 import { ask } from "@tauri-apps/plugin-dialog";
+import { get } from "svelte/store";
 import * as api from "./api";
-import { errorString, pushToast, refresh } from "./stores";
+import { errorString, pushToast, refresh, selectedVobe } from "./stores";
 import type { Vobe } from "./types";
 
 /// Open the vobe's directory in the default editor. Resolves the user's
@@ -45,10 +46,16 @@ export async function copyPath(v: Vobe) {
 }
 
 /// Toggle the pinned flag and refresh so the dashboard re-sorts.
+/// Also nudges `selectedVobe` if it points at the same vobe, so the
+/// Projects-view Pin/Unpin button label flips without a navigation.
 export async function togglePin(v: Vobe) {
 	try {
-		await api.setPinned(v.name, !v.pinned);
+		await api.setPinned(v.id, !v.pinned);
 		await refresh({ silent: true });
+		const cur = get(selectedVobe);
+		if (cur && cur.id === v.id) {
+			selectedVobe.set({ ...cur, pinned: !v.pinned });
+		}
 	} catch (e) {
 		pushToast({ kind: "error", message: errorString(e) });
 	}

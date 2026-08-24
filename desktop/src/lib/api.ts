@@ -106,8 +106,8 @@ export async function saveNotes(
 	return invoke<Vobe>("save_notes", { name, notes })
 }
 
-export async function setPinned(name: string, pinned: boolean): Promise<void> {
-	return invoke<void>("set_pinned", { name, pinned })
+export async function setPinned(id: string, pinned: boolean): Promise<void> {
+	return invoke<void>("set_pinned", { id, pinned })
 }
 
 export async function setTags(name: string, tags: string[]): Promise<Vobe> {

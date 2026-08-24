@@ -6,7 +6,7 @@ use std::sync::Arc;
 use serde::Serialize;
 use tauri::State;
 
-use vobes_core::{ActivityEvent, ActivityKind, Result};
+use vobes_core::{ActivityEvent, ActivityKind, Result, VobeId};
 use vobes_store::{Filter, SavedFilter, Sort};
 
 use crate::commands::shared::{absolute_normalized, lookup_vobe, vobe_from_detection};
@@ -353,28 +353,18 @@ pub async fn save_notes(
 #[tauri::command]
 pub async fn set_pinned(
     state: State<'_, Arc<DesktopCtx>>,
-    name: String,
+    id: String,
     pinned: bool,
 ) -> Result<()> {
-    let Some(mut vobe) = lookup_vobe(&state.store, &name)? else {
-        return Err(vobes_core::Error::not_found(name));
+    let id = VobeId::from_string(id);
+    let Some(mut vobe) = state.store.get_vobe(&id)? else {
+        return Err(vobes_core::Error::not_found(id.to_string()));
     };
     if vobe.pinned != pinned {
         vobe.pinned = pinned;
         state.store.upsert_vobe(&vobe)?;
     }
     Ok(())
-}
-
-/// List the names of currently pinned vobes.
-#[tauri::command]
-pub async fn get_pinned(state: State<'_, Arc<DesktopCtx>>) -> Result<Vec<String>> {
-    let vobes = state.store.list_vobes(&Filter::all(), Sort::LastModified)?;
-    Ok(vobes
-        .iter()
-        .filter(|v| v.pinned)
-        .map(|v| v.name.clone())
-        .collect())
 }
 
 /// Update a vobe's tag set. Returns the refreshed vobe.

@@ -127,6 +127,46 @@ fn save_to_round_trips() {
 }
 
 #[test]
+fn pre_audit_config_loads_after_stripping_removed_sections() {
+    // Pre-audit configs carried [general], [git], [export] sections.
+    // load_from should strip those silently and parse the rest, not
+    // silently fall back to defaults (which would lose the user's
+    // scan roots + depth + exclude settings).
+    let dir = std::env::temp_dir().join("vobes-config-migrate-tests");
+    std::fs::create_dir_all(&dir).unwrap();
+    let p = dir.join("config.toml");
+    let legacy = r#"
+[general]
+name = "Personal Workspace"
+
+[scan]
+roots = ["~/dev", "~/work"]
+exclude = ["scratch", "experiments"]
+max_depth = 4
+follow_symlinks = false
+
+[git]
+cache_ttl_seconds = 60
+fetch_upstream = false
+
+[export]
+format = "json"
+
+[desktop]
+notify_behind = true
+launch_on_login = true
+"#;
+    std::fs::write(&p, legacy).unwrap();
+    let loaded = Config::load_from(&p).unwrap();
+    assert_eq!(loaded.scan.max_depth, 4);
+    assert!(!loaded.scan.follow_symlinks);
+    assert_eq!(loaded.scan.roots, vec!["~/dev".to_string(), "~/work".to_string()]);
+    assert!(loaded.desktop.notify_behind);
+    std::fs::remove_file(&p).ok();
+    std::fs::remove_dir(&dir).ok();
+}
+
+#[test]
 fn shipped_example_toml_parses() {
     // The vobes.example.toml at the repo root must always parse
     // against the current schema — catches stale fields after a

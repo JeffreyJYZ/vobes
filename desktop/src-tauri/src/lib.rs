@@ -92,7 +92,6 @@ pub fn run() {
             commands::copy_to_clipboard,
             commands::save_notes,
             commands::set_pinned,
-            commands::get_pinned,
             commands::set_tags,
             commands::read_readme,
             commands::scrape_todos,

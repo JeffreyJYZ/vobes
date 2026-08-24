@@ -31,15 +31,16 @@
 	class="card"
 	class:compact
 	class:attention={needsAttention}
+	class:pinned
 	role="button"
 	tabindex="0"
 	on:contextmenu={onContext}
 >
 	<div class="row1">
 		<span class="name">{vobe.name}</span>
-		{#if pinned}
-			<span class="pin" title="Pinned">★</span>
-		{/if}
+		<span class="pin" class:on={pinned} title={pinned ? "Pinned" : "Not pinned"}>
+			{pinned ? "★" : "☆"}
+		</span>
 		<span class="lang" class:vanilla={isVanilla}>{lang}</span>
 	</div>
 	{#if !compact}
@@ -93,6 +94,9 @@
 	.card.attention {
 		border-color: color-mix(in srgb, var(--warn) 40%, var(--border));
 	}
+	.card.pinned {
+		background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated));
+	}
 	.card.compact {
 		padding: 10px 12px;
 	}
@@ -128,8 +132,11 @@
 		background: transparent;
 	}
 	.pin {
-		color: var(--accent);
+		color: var(--fg-faint);
 		font-size: 13px;
+	}
+	.pin.on {
+		color: var(--accent);
 	}
 	.meta {
 		color: var(--fg-muted);
