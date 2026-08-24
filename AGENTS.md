@@ -124,9 +124,9 @@ desktop/
 
 ## Don'ts
 
-- Don't push. Commit only.
+- Don't push unless very explicit message from user. Commit only.
 - Don't reformat the whole tree to biome's house style.
 - Don't add tests, doc-comments, or refactors the user didn't request.
 - Don't introduce a build-time codegen pipeline unless asked.
-- Don't break the desktop ↔ CLI parity contract without flagging it in
-  the parity table in `README.md`.
+- Don't break the desktop ↔ CLI parity contract without flagging it in the parity table in `README.md`.
+- Always prefer ripgrep of grep, when applicable.

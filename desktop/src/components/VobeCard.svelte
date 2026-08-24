@@ -17,9 +17,24 @@
 	$: fw = frameworkLabel(vobe.framework);
 	$: pm = packageManagerLabel(vobe.package_manager);
 	$: isVanilla = !vobe.language && !vobe.framework;
+
+	function onContext(e: MouseEvent) {
+		e.preventDefault();
+		dispatch("contextmenu", { vobe, x: e.clientX, y: e.clientY });
+	}
+
+	import { createEventDispatcher } from "svelte";
+	const dispatch = createEventDispatcher();
 </script>
 
-<div class="card" class:compact class:attention={needsAttention}>
+<div
+	class="card"
+	class:compact
+	class:attention={needsAttention}
+	role="button"
+	tabindex="0"
+	on:contextmenu={onContext}
+>
 	<div class="row1">
 		<span class="name">{vobe.name}</span>
 		{#if pinned}

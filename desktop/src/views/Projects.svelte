@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { ask } from "@tauri-apps/plugin-dialog";
 	import { onDestroy, onMount } from "svelte";
+	import * as actions from "../lib/actions";
 	import * as api from "../lib/api";
 	import Select from "../components/Select.svelte";
 	import {
@@ -141,8 +141,7 @@
 	async function doOpenInEditor(v: (typeof $vobes)[number]) {
 		busy = true;
 		try {
-			await api.markOpened(v.name);
-			await api.openInEditor(v.name, selectedEditor ?? undefined);
+			await actions.openInEditor(v, selectedEditor ?? undefined);
 			pushToast({
 				kind: "success",
 				message: `Opened ${v.name} in editor.`,
@@ -157,9 +156,11 @@
 	async function doOpenTerminal(v: (typeof $vobes)[number]) {
 		busy = true;
 		try {
-			await api.markOpened(v.name);
-			await api.openInTerminal(v.name, selectedTerminal ?? "");
-			pushToast({ kind: "success", message: `Terminal at ${v.name}.` });
+			await actions.openInTerminal(v, selectedTerminal ?? "");
+			pushToast({
+				kind: "success",
+				message: `Terminal at ${v.name}.`,
+			});
 		} catch (e) {
 			pushToast({ kind: "error", message: errorString(e) });
 		} finally {
@@ -170,7 +171,7 @@
 	async function doReveal(v: (typeof $vobes)[number]) {
 		busy = true;
 		try {
-			await api.revealInFinder(v.name);
+			await actions.revealInFinder(v);
 		} catch (e) {
 			pushToast({ kind: "error", message: errorString(e) });
 		} finally {
@@ -179,12 +180,7 @@
 	}
 
 	async function doCopyPath(v: (typeof $vobes)[number]) {
-		try {
-			await api.copyText(v.path);
-			pushToast({ kind: "info", message: "Path copied." });
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		}
+		await actions.copyPath(v);
 	}
 
 	async function doCopyContextPack(v: (typeof $vobes)[number]) {
@@ -209,9 +205,7 @@
 	async function togglePin(v: (typeof $vobes)[number]) {
 		busy = true;
 		try {
-			await api.setPinned(v.name, !v.pinned);
-			const fresh = $vobes.find((x) => x.id === v.id) ?? null;
-			selectedVobe.set(fresh);
+			await actions.togglePin(v);
 		} catch (e) {
 			pushToast({ kind: "error", message: errorString(e) });
 		} finally {
@@ -220,17 +214,10 @@
 	}
 
 	async function removeVobe(v: (typeof $vobes)[number]) {
-		const ok = await ask(
-			`Remove ${v.name}? This only untracks it; the files are untouched.`,
-			{ title: "Vobes", kind: "warning" },
-		);
-		if (!ok) {
-			return;
-		}
 		busy = true;
 		try {
-			await api.removeVobe(v.name);
-			pushToast({ kind: "success", message: `Removed ${v.name}.` });
+			await actions.removeVobe(v);
+			if (await api.getVobe(v.name)) return;
 			selectedVobe.set(null);
 			view.set("dashboard");
 		} catch (e) {

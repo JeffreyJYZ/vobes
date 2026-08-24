@@ -8,7 +8,9 @@
 
 <script lang="ts">
 	import { ask } from "@tauri-apps/plugin-dialog";
+	import * as actions from "../lib/actions";
 	import Attention from "../components/Attention.svelte";
+	import ContextMenu from "../components/ContextMenu.svelte";
 	import Select from "../components/Select.svelte";
 	import VobeCard from "../components/VobeCard.svelte";
 	import { relativeTime } from "../lib/format";
@@ -30,6 +32,58 @@
 	import type { SortKey, Vobe } from "../lib/types";
 
 	let searchEl: HTMLInputElement;
+
+	let ctxX = 0;
+	let ctxY = 0;
+	let ctxVobe: Vobe | null = null;
+	let ctxDefaultEditor = "";
+	let ctxDefaultTerminal = "";
+
+	try {
+		ctxDefaultEditor = localStorage.getItem("vobes:default-editor") ?? "";
+		ctxDefaultTerminal = localStorage.getItem("vobes:default-terminal") ?? "";
+	} catch {}
+
+	function onCardContext(e: CustomEvent<{ vobe: Vobe; x: number; y: number }>) {
+		ctxVobe = e.detail.vobe;
+		ctxX = e.detail.x;
+		ctxY = e.detail.y;
+	}
+
+	$: ctxItems = ctxVobe
+		? [
+				{
+					label: `Open in editor${
+						ctxDefaultEditor ? ` (${ctxDefaultEditor})` : ""
+					}`,
+					onClick: () => actions.openInEditor(ctxVobe!, ctxDefaultEditor),
+				},
+				{
+					label: `Open in terminal${
+						ctxDefaultTerminal ? ` (${ctxDefaultTerminal})` : ""
+					}`,
+					onClick: () => actions.openInTerminal(ctxVobe!, ctxDefaultTerminal),
+				},
+				{
+					label: "Reveal in Finder",
+					onClick: () => actions.revealInFinder(ctxVobe!),
+				},
+				{ label: "Copy path", onClick: () => actions.copyPath(ctxVobe!) },
+				{
+					label: ctxVobe!.pinned ? "Unpin" : "Pin",
+					onClick: () => actions.togglePin(ctxVobe!),
+				},
+				{
+					label: "Remove",
+					danger: true,
+					onClick: () => actions.removeVobe(ctxVobe!),
+				},
+			]
+		: [];
+
+	function closeCtx() {
+		ctxVobe = null;
+	}
 
 	$: filtered = filterAndSort($vobes, $searchQuery, $sortKey);
 
@@ -210,12 +264,25 @@
 		<div class="grid" class:list={$density === "compact"}>
 			{#each filtered as v (v.id)}
 				<button class="card-btn" on:click={() => open(v)}>
-					<VobeCard vobe={v} compact={$density === "compact"} />
+					<VobeCard
+						vobe={v}
+						compact={$density === "compact"}
+						on:contextmenu={onCardContext}
+					/>
 				</button>
 			{/each}
 		</div>
 	{/if}
 </div>
+
+{#if ctxVobe}
+	<ContextMenu
+		x={ctxX}
+		y={ctxY}
+		items={ctxItems}
+		onClose={closeCtx}
+	/>
+{/if}
 
 <style>
 	.dashboard {
