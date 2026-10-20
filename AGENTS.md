@@ -98,6 +98,13 @@ To bump a crate:
 `Vobes vX.Y.Z Pre-alpha` — user publishes manually. `quality` job
 (`fmt + clippy + test`, `--exclude vobes-desktop`) gates release build.
 
+- **A tag pushed by `GITHUB_TOKEN` never triggers another workflow** (GitHub's
+  anti-recursion rule), so `bump.yml` must `gh workflow run release.yml --ref
+  "$TAG"` after tagging — otherwise the tag lands and no build ever starts
+  (cost v0.1.10). Pushing the tag by hand from a laptop *does* trigger it.
+- `bump.yml` publishes bumped crates and skips versions already on the
+  registry; needs secret `CARGO_REGISTRY_TOKEN`.
+
 ## Schema migrations
 
 - Bump `SCHEMA_VERSION` in `crates/vobes-store/src/schema.rs` whenever migration
