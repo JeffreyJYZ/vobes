@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - "v*"
+  # bump.yml dispatches this on the tag ref: a tag pushed with GITHUB_TOKEN
+  # does not trigger workflows on its own.
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always

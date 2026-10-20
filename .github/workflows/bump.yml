@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  # Needed to dispatch release.yml after tagging.
+  actions: write
 
 jobs:
   release:
@@ -72,6 +74,7 @@ jobs:
           steps.inspect.outputs.marker == '1'
         env:
           TAG: v${{ steps.inspect.outputs.desktop_version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -86,6 +89,10 @@ jobs:
           fi
           git tag "$TAG"
           git push origin "$TAG"
+          # A tag pushed with GITHUB_TOKEN does NOT trigger other workflows
+          # (GitHub's anti-recursion rule), so release.yml would never run.
+          # Dispatch it explicitly on the tag ref.
+          gh workflow run release.yml --ref "$TAG"
 
       - name: publish bumped crates to crates.io
         if: contains(steps.inspect.outputs.bumped_crates, '@')
