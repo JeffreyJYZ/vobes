@@ -5,7 +5,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use vobes_scan::{DefaultScanner, Scanner};
+use vobes_scan::DefaultScanner;
 
 fn fixture(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("vobes-det-case-{name}-{}", std::process::id()));

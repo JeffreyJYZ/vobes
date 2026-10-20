@@ -68,13 +68,25 @@ fn list_filters_by_tag() {
     store.upsert_vobe(&b).unwrap();
 
     let personal = store
-        .list_vobes(&Filter::all().with_tag("personal"), Sort::Name)
+        .list_vobes(
+            &Filter {
+                tag: Some("personal".into()),
+                ..Filter::default()
+            },
+            Sort::Name,
+        )
         .unwrap();
     assert_eq!(personal.len(), 1);
     assert_eq!(personal[0].name, "a");
 
     let work = store
-        .list_vobes(&Filter::all().with_tag("work"), Sort::Name)
+        .list_vobes(
+            &Filter {
+                tag: Some("work".into()),
+                ..Filter::default()
+            },
+            Sort::Name,
+        )
         .unwrap();
     assert_eq!(work.len(), 2);
 }
@@ -93,7 +105,13 @@ fn list_filters_dirty() {
     store.upsert_vobe(&dirty).unwrap();
 
     let dirty_list = store
-        .list_vobes(&Filter::all().only_dirty(), Sort::Name)
+        .list_vobes(
+            &Filter {
+                only_dirty: true,
+                ..Filter::default()
+            },
+            Sort::Name,
+        )
         .unwrap();
     assert_eq!(dirty_list.len(), 1);
     assert_eq!(dirty_list[0].name, "dirty");

@@ -1,7 +1,7 @@
 [package]
 name = "vobes-cli"
 description = "Vobes CLI — the vbs command."
-version = "0.1.5"
+version = "0.1.6"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -28,6 +28,5 @@ indicatif = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tracing-subscriber = { workspace = true }
 dirs = { workspace = true }
 chrono = { workspace = true }

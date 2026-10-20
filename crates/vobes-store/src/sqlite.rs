@@ -78,21 +78,11 @@ impl Store for SqliteStore {
         self.with_conn(|conn| {
             let mut sql = String::from("SELECT * FROM vobes WHERE 1=1");
             let mut args: Vec<rusqlite::types::Value> = Vec::new();
-            let mut next_idx = 1usize;
 
             if let Some(tag) = &filter.tag {
-                sql.push_str(&format!(" AND tags LIKE ?{next_idx}"));
+                sql.push_str(" AND tags LIKE ?1");
                 args.push(format!("%\"{tag}\"%").into());
-                next_idx += 1;
             }
-            if let Some(since) = filter.modified_since {
-                sql.push_str(&format!(
-                    " AND last_modified IS NOT NULL AND last_modified >= ?{next_idx}"
-                ));
-                args.push(since.to_rfc3339().into());
-                next_idx += 1;
-            }
-            let _ = next_idx;
             if filter.only_dirty {
                 sql.push_str(" AND git_dirty = 1");
             }
@@ -102,10 +92,6 @@ impl Store for SqliteStore {
 
             match sort {
                 Sort::Name => sql.push_str(" ORDER BY pinned DESC, name ASC"),
-                Sort::CreatedAt => sql.push_str(" ORDER BY pinned DESC, created_at DESC"),
-                Sort::LastOpened => {
-                    sql.push_str(" ORDER BY pinned DESC, last_opened DESC NULLS LAST")
-                }
                 Sort::LastModified => {
                     sql.push_str(" ORDER BY pinned DESC, last_modified DESC NULLS LAST")
                 }

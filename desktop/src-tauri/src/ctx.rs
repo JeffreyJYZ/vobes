@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use vobes_config::Config;
 use vobes_core::{ActivityEvent, Error, Result, Vobe, VobeId};
-use vobes_scan::{DefaultScanner, Scanner};
+use vobes_scan::DefaultScanner;
 use vobes_store::{Filter, SavedFilter, Sort, SqliteStore, Store};
 
 /// Wires together config, store, scanner. Managed by Tauri state.
@@ -17,7 +17,7 @@ pub struct DesktopCtx {
     /// Storage.
     pub store: Arc<dyn Store>,
     /// Scanner — wrapped in a Mutex for the same reason as `config`.
-    pub scanner: Mutex<Arc<dyn Scanner>>,
+    pub scanner: Mutex<Arc<DefaultScanner>>,
     /// DB file (used by export defaults). Empty when running degraded
     /// (in-memory store).
     pub db_path: PathBuf,
@@ -79,7 +79,7 @@ impl DesktopCtx {
     }
 
     fn with_store(config: Config, store: Arc<dyn Store>, db_path: PathBuf) -> Self {
-        let scanner: Arc<dyn Scanner> = Arc::new(
+        let scanner: Arc<DefaultScanner> = Arc::new(
             DefaultScanner::with_standard_detectors()
                 .with_extra_excludes(config.scan.exclude.clone())
                 .with_max_depth(config.scan.max_depth)
@@ -108,7 +108,7 @@ impl DesktopCtx {
                 Arc::new(BrokenStore)
             }
         };
-        let scanner: Arc<dyn Scanner> = Arc::new(DefaultScanner::with_standard_detectors());
+        let scanner: Arc<DefaultScanner> = Arc::new(DefaultScanner::with_standard_detectors());
         Self {
             config: Mutex::new(config),
             store,
@@ -124,7 +124,7 @@ impl DesktopCtx {
     }
 
     /// Read the current scanner (clones the Arc — cheap).
-    pub fn scanner_snapshot(&self) -> Arc<dyn Scanner> {
+    pub fn scanner_snapshot(&self) -> Arc<DefaultScanner> {
         self.scanner
             .lock()
             .map(|g| g.clone())

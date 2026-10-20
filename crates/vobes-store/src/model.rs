@@ -11,8 +11,6 @@ use vobes_core::{ActivityEvent, Vobe};
 pub struct Filter {
     /// Filter by tag (all vobes with this tag).
     pub tag: Option<String>,
-    /// Only vobes modified since this time.
-    pub modified_since: Option<DateTime<Utc>>,
     /// Only vobes whose `git.dirty` is true.
     pub only_dirty: bool,
     /// Exclude vobes tagged `archived`.
@@ -25,27 +23,9 @@ impl Filter {
         Self::default()
     }
 
-    /// Only show vobes with this tag.
-    pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
-        self.tag = Some(tag.into());
-        self
-    }
-
-    /// Only show vobes with uncommitted changes.
-    pub fn only_dirty(mut self) -> Self {
-        self.only_dirty = true;
-        self
-    }
-
     /// Hide archived vobes from the listing.
     pub fn exclude_archived(mut self) -> Self {
         self.exclude_archived = true;
-        self
-    }
-
-    /// Only show vobes modified since the given timestamp.
-    pub fn modified_since(mut self, since: DateTime<Utc>) -> Self {
-        self.modified_since = Some(since);
         self
     }
 }
@@ -56,10 +36,6 @@ impl Filter {
 pub enum Sort {
     /// By name, ascending.
     Name,
-    /// By creation time, newest first.
-    CreatedAt,
-    /// By last opened, newest first.
-    LastOpened,
     /// By last modified, newest first.
     #[default]
     LastModified,

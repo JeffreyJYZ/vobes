@@ -12,7 +12,7 @@ use std::io::{BufRead, BufReader, Write};
 use serde_json::{json, Value};
 use vobes_cli::app::App;
 use vobes_core::{normalize, ActivityEvent, Vobe};
-use vobes_store::{Filter, Sort, Store};
+use vobes_store::{Filter, Sort};
 
 fn main() -> std::process::ExitCode {
     let app = match App::load() {

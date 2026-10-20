@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use vobes_config::{config_path, Config};
-use vobes_scan::{DefaultScanner, Scanner};
+use vobes_scan::DefaultScanner;
 use vobes_store::{SqliteStore, Store};
 
 /// Top-level CLI context.
@@ -14,7 +14,7 @@ pub struct App {
     /// Storage surface.
     pub store: Arc<dyn Store>,
     /// Scanner (DefaultScanner with config-driven excludes + depth).
-    pub scanner: Arc<dyn Scanner>,
+    pub scanner: Arc<DefaultScanner>,
     /// Path to the active config file (for `init` and messages).
     pub config_path: Option<PathBuf>,
 }
@@ -36,7 +36,7 @@ impl App {
         })?;
         let store: Arc<dyn Store> = Arc::new(SqliteStore::open(&db_path)?);
 
-        let scanner: Arc<dyn Scanner> = Arc::new(
+        let scanner: Arc<DefaultScanner> = Arc::new(
             DefaultScanner::with_standard_detectors()
                 .with_extra_excludes(config.scan.exclude.clone())
                 .with_max_depth(config.scan.max_depth)

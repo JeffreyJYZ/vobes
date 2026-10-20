@@ -1,5 +1,5 @@
-//! The default scanner — walks roots with `walkdir`, runs detectors in
-//! parallel with `rayon`, and produces `ScanReport`s.
+//! The default scanner — walks roots with `walkdir` and runs detectors
+//! in parallel with `rayon`.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -8,34 +8,9 @@ use rayon::prelude::*;
 use vobes_core::Result;
 use walkdir::WalkDir;
 
-use crate::detector::{Detection, Detector, Scanner};
+use crate::detector::{Detection, Detector};
 use crate::exclude::{is_code_subdir, is_excluded};
 use crate::{FrameworkDetector, LanguageDetector, PackageManagerDetector, RepoDetector};
-
-/// Output of scanning a single root.
-#[derive(Debug, Clone, Default)]
-pub struct ScanReport {
-    /// Root that was scanned.
-    pub root: PathBuf,
-    /// `(path, detection)` pairs for every candidate vobe found.
-    pub vobes: Vec<(PathBuf, Detection)>,
-    /// Number of directories walked.
-    pub dirs_walked: usize,
-    /// Number of directories skipped because of excludes.
-    pub dirs_skipped: usize,
-}
-
-impl ScanReport {
-    /// Total number of vobes discovered.
-    pub fn count(&self) -> usize {
-        self.vobes.len()
-    }
-
-    /// Whether any vobes were discovered.
-    pub fn is_empty(&self) -> bool {
-        self.vobes.is_empty()
-    }
-}
 
 /// Default scanner composing a set of detectors.
 #[derive(Clone)]
@@ -89,14 +64,10 @@ impl DefaultScanner {
         self.follow_symlinks = follow;
         self
     }
-}
 
-impl Scanner for DefaultScanner {
-    fn scan(&self, root: &Path) -> Result<Vec<(PathBuf, Detection)>> {
-        Ok(self.scan_report(root)?.vobes)
-    }
-
-    fn detect(&self, path: &Path) -> Result<Detection> {
+    /// Run every detector against one path and merge the result.
+    /// Used by on-demand add commands that don't need a full walk.
+    pub fn detect(&self, path: &Path) -> Result<Detection> {
         let mut merged = Detection::empty();
         for d in self.detectors.iter() {
             if let Ok(Some(det)) = d.detect(path) {
@@ -105,16 +76,11 @@ impl Scanner for DefaultScanner {
         }
         Ok(merged)
     }
-}
 
-impl DefaultScanner {
-    /// Scan a root and return a full [`ScanReport`].
-    pub fn scan_report(&self, root: &Path) -> Result<ScanReport> {
+    /// Scan a single root directory, returning `(path, detection)` pairs
+    /// for every candidate vobe found.
+    pub fn scan(&self, root: &Path) -> Result<Vec<(PathBuf, Detection)>> {
         let extra = self.extra_excludes.clone();
-        let detectors = self.detectors.clone();
-
-        let mut dirs_walked = 0usize;
-        let mut dirs_skipped = 0usize;
         let mut candidates: Vec<PathBuf> = Vec::new();
 
         for entry in WalkDir::new(root)
@@ -129,18 +95,13 @@ impl DefaultScanner {
                 let Some(n) = name.to_str() else {
                     return true;
                 };
-                if is_excluded(n, &extra) {
-                    dirs_skipped += 1;
-                    return false;
-                }
-                true
+                !is_excluded(n, &extra)
             })
         {
             let Ok(entry) = entry else { continue };
             if !entry.file_type().is_dir() {
                 continue;
             }
-            dirs_walked += 1;
             // Source-only subdirs (src, src-tauri, lib, app) are not
             // themselves projects, but we still descend so the parent
             // project's detectors can see their files.
@@ -155,36 +116,16 @@ impl DefaultScanner {
             candidates.push(entry.path().to_path_buf());
         }
 
-        // Run detectors in parallel across candidate directories.
-        let detections: Vec<(PathBuf, Detection)> = candidates
+        // Run detectors in parallel across candidate directories, then
+        // keep only directories that look like project roots: either a
+        // git repo, or a framework/package-manager signal (drops empty
+        // roots that only contain other projects, e.g. `~/dev` itself).
+        let vobes = candidates
             .par_iter()
-            .filter_map(|path| {
-                let mut merged = Detection::empty();
-                let mut any = false;
-                for d in detectors.iter() {
-                    if let Ok(Some(det)) = d.detect(path) {
-                        merged.merge(det);
-                        any = true;
-                    }
-                }
-                any.then(|| (path.clone(), merged))
-            })
-            .collect();
-
-        // Keep only directories that look like project roots: either a
-        // git repo, or any detector produced a signal. We already filtered
-        // to `any == true`. Additionally, drop empty roots that only
-        // contain other projects (e.g. `~/dev` itself).
-        let vobes: Vec<(PathBuf, Detection)> = detections
-            .into_iter()
+            .filter_map(|path| self.detect(path).ok().map(|d| (path.clone(), d)))
             .filter(|(_, d)| d.is_repo || d.framework.is_some() || d.package_manager.is_some())
             .collect();
 
-        Ok(ScanReport {
-            root: root.to_path_buf(),
-            vobes,
-            dirs_walked,
-            dirs_skipped,
-        })
+        Ok(vobes)
     }
 }

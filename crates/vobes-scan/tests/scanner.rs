@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use vobes_scan::{DefaultScanner, Scanner};
+use vobes_scan::DefaultScanner;
 
 fn fixture(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("vobes-scan-test-{name}"));
@@ -32,10 +32,10 @@ fn detects_rust_project_with_cargo_and_framework() {
     write(&dir, "src/main.rs", "fn main() {}\n");
 
     let scanner = DefaultScanner::with_standard_detectors().with_max_depth(2);
-    let report = scanner.scan_report(&dir).unwrap();
-    assert_eq!(report.count(), 1, "got {report:?}");
+    let found = scanner.scan(&dir).unwrap();
+    assert_eq!(found.len(), 1, "got {:?}", found.len());
 
-    let (_, detection) = &report.vobes[0];
+    let (_, detection) = &found[0];
     assert_eq!(detection.package_manager.as_deref(), Some("cargo"));
     assert_eq!(detection.framework.as_deref(), Some("Tauri"));
     assert_eq!(detection.language.as_deref(), Some("Rust"));
@@ -55,10 +55,10 @@ fn detects_rust_library_without_cargo_lock() {
     write(&dir, "src/lib.rs", "");
 
     let scanner = DefaultScanner::with_standard_detectors().with_max_depth(2);
-    let report = scanner.scan_report(&dir).unwrap();
-    assert_eq!(report.count(), 1, "got {report:?}");
+    let found = scanner.scan(&dir).unwrap();
+    assert_eq!(found.len(), 1, "got {:?}", found.len());
 
-    let (_, detection) = &report.vobes[0];
+    let (_, detection) = &found[0];
     assert_eq!(
         detection.package_manager.as_deref(),
         Some("cargo"),
@@ -85,9 +85,9 @@ fn detects_node_project_with_pnpm() {
     );
 
     let scanner = DefaultScanner::with_standard_detectors().with_max_depth(2);
-    let report = scanner.scan_report(&dir).unwrap();
-    assert_eq!(report.count(), 1);
-    let (_, detection) = &report.vobes[0];
+    let found = scanner.scan(&dir).unwrap();
+    assert_eq!(found.len(), 1);
+    let (_, detection) = &found[0];
     assert_eq!(detection.package_manager.as_deref(), Some("pnpm"));
     assert_eq!(detection.framework.as_deref(), Some("Next.js"));
     assert_eq!(detection.language.as_deref(), Some("TypeScript"));
@@ -102,9 +102,9 @@ fn detects_git_repo_via_dotgit_dir() {
     write(&dir, "main.py", "print(\"hi\")\n");
 
     let scanner = DefaultScanner::with_standard_detectors().with_max_depth(3);
-    let report = scanner.scan_report(&dir).unwrap();
-    assert_eq!(report.count(), 1);
-    let (_, detection) = &report.vobes[0];
+    let found = scanner.scan(&dir).unwrap();
+    assert_eq!(found.len(), 1);
+    let (_, detection) = &found[0];
     assert!(detection.is_repo);
     assert_eq!(detection.language.as_deref(), Some("Python"));
 }
@@ -118,15 +118,9 @@ fn excludes_builtin_junk_dirs() {
     write(&dir, "node_modules/foo.js", "module.exports = 1;\n");
 
     let scanner = DefaultScanner::with_standard_detectors().with_max_depth(3);
-    let report = scanner.scan_report(&dir).unwrap();
+    let found = scanner.scan(&dir).unwrap();
     // Only one vobe — the project itself; node_modules excluded.
-    assert_eq!(report.count(), 1);
-    // Skipped counter incremented (>=1 for node_modules)
-    assert!(
-        report.dirs_skipped >= 1,
-        "dirs_skipped = {}",
-        report.dirs_skipped
-    );
+    assert_eq!(found.len(), 1);
 }
 
 #[test]
@@ -141,33 +135,18 @@ fn respects_user_excludes() {
     let scanner = DefaultScanner::with_standard_detectors()
         .with_max_depth(3)
         .with_extra_excludes(vec!["scratch".to_string()]);
-    let report = scanner.scan_report(&dir).unwrap();
-    assert_eq!(report.count(), 1);
-    assert_eq!(report.vobes[0].0, dir);
+    let found = scanner.scan(&dir).unwrap();
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].0, dir);
 }
 
 #[test]
 fn empty_dir_produces_no_vobes() {
     let dir = fixture("empty");
     let scanner = DefaultScanner::with_standard_detectors();
-    let report = scanner.scan_report(&dir).unwrap();
-    assert_eq!(report.count(), 0);
-    assert!(report.is_empty());
-}
-
-#[test]
-fn scan_via_trait_object() {
-    let dir = fixture("trait");
-    write(&dir, "go.mod", "module demo\n\ngo 1.21\n");
-    write(&dir, "main.go", "package main\nfunc main() {}\n");
-    write(&dir, "go.sum", "");
-
-    let scanner: Box<dyn Scanner> = Box::new(DefaultScanner::with_standard_detectors());
-    let vobes = scanner.scan(&dir).unwrap();
-    assert_eq!(vobes.len(), 1);
-    let (_, d) = &vobes[0];
-    assert_eq!(d.package_manager.as_deref(), Some("go"));
-    assert_eq!(d.language.as_deref(), Some("Go"));
+    let found = scanner.scan(&dir).unwrap();
+    assert_eq!(found.len(), 0);
+    assert!(found.is_empty());
 }
 
 #[test]
@@ -193,9 +172,9 @@ fn nextjs_prefers_typescript_over_css() {
     write(&dir, "global.css", "body { margin: 0; }\n");
 
     let scanner = DefaultScanner::with_standard_detectors().with_max_depth(4);
-    let report = scanner.scan_report(&dir).unwrap();
-    assert_eq!(report.count(), 1);
-    let (_, detection) = &report.vobes[0];
+    let found = scanner.scan(&dir).unwrap();
+    assert_eq!(found.len(), 1);
+    let (_, detection) = &found[0];
     // Source language must beat styling/markup even when outnumbered.
     assert_eq!(detection.language.as_deref(), Some("TypeScript"));
 }

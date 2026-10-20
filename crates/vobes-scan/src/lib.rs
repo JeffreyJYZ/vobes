@@ -13,7 +13,7 @@ mod scanner;
 
 pub use detector::{
     framework::FrameworkDetector, language::LanguageDetector, package::PackageManagerDetector,
-    repo::RepoDetector, Detection, Detector, Scanner,
+    repo::RepoDetector, Detection, Detector,
 };
 pub use exclude::{is_code_subdir, is_excluded, BUILTIN_EXCLUDES};
-pub use scanner::{DefaultScanner, ScanReport};
+pub use scanner::DefaultScanner;

@@ -95,12 +95,6 @@ pub enum Command {
 }
 
 fn main() -> std::process::ExitCode {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .with_target(false)
-        .compact()
-        .init();
-
     let cli = Cli::parse();
 
     match cli.command {

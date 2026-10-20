@@ -20,53 +20,37 @@ use std::path::{Path, PathBuf};
 /// Returns a `PathBuf` whose `to_string_lossy()` is stable across
 /// platforms and input separator styles.
 pub fn normalize(path: &Path) -> PathBuf {
-    let s = path.to_string_lossy();
+    let s = path.to_string_lossy().replace('\\', "/");
+    let (drive, body) = match s.get(..2) {
+        Some(d)
+            if d.len() == 2 && d.as_bytes()[1] == b':' && d.as_bytes()[0].is_ascii_alphabetic() =>
+        {
+            (Some(d), &s[2..])
+        }
+        _ => (None, s.as_str()),
+    };
+    let absolute = body.starts_with('/');
+
     let mut parts: Vec<&str> = Vec::new();
-    let mut absolute = false;
-
-    let normalized: String = s.replace('\\', "/");
-    let trimmed = normalized.as_str();
-
-    if trimmed.starts_with('/') {
-        absolute = true;
-    }
-    // Windows drive letter: "C:/..."
-    let drive = if trimmed.len() >= 2
-        && trimmed.as_bytes()[1] == b':'
-        && trimmed.as_bytes()[0].is_ascii_alphabetic()
-    {
-        Some(&trimmed[..2])
-    } else {
-        None
-    };
-    let body_start = if drive.is_some() { 2 } else { 0 };
-    let body = if absolute && drive.is_some() {
-        &trimmed[3..] // skip "C:/"
-    } else if absolute {
-        &trimmed[1..] // skip "/"
-    } else {
-        &trimmed[body_start..]
-    };
-
     for seg in body.split('/') {
         match seg {
-            "" | "." => continue,
-            ".." => {
-                if parts.last().is_some_and(|p| *p != "..") && !parts.is_empty() {
+            "" | "." => {}
+            ".." => match parts.last() {
+                Some(prev) if *prev != ".." => {
                     parts.pop();
-                } else if !absolute && drive.is_none() {
-                    parts.push("..");
                 }
-            }
-            s => parts.push(s),
+                _ if !absolute && drive.is_none() => parts.push(".."),
+                _ => {}
+            },
+            p => parts.push(p),
         }
     }
 
     let mut joined = String::new();
     if let Some(d) = drive {
         joined.push_str(d);
-        joined.push('/');
-    } else if absolute {
+    }
+    if absolute || drive.is_some() {
         joined.push('/');
     }
     joined.push_str(&parts.join("/"));

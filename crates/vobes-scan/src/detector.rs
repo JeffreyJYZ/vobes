@@ -64,16 +64,3 @@ pub trait Detector: Send + Sync {
     /// Inspect a path and report a detection (or `None`).
     fn detect(&self, path: &Path) -> Result<Option<Detection>>;
 }
-
-/// Trait implemented by scanners.
-pub trait Scanner: Send + Sync {
-    /// Scan a single root directory, returning `(path, detection)` pairs
-    /// for every candidate vobe found.
-    fn scan(&self, root: &Path) -> Result<Vec<(std::path::PathBuf, Detection)>>;
-    /// Run every detector against one path and merge the result.
-    /// Used by on-demand add commands that don't need a full walk.
-    fn detect(&self, path: &Path) -> Result<Detection> {
-        let _ = path;
-        Ok(Detection::empty())
-    }
-}
