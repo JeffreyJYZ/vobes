@@ -94,4 +94,8 @@ jobs:
         run: cargo clippy -p vobes-desktop --all-targets -- -D warnings
 
       - name: build desktop (debug)
-        run: cargo build -p vobes-desktop
+        working-directory: desktop
+        # `tauri build`, not `cargo build`: only the CLI checks that every
+        # tauri plugin crate matches its npm twin on major.minor, and a drift
+        # fails the release build (not this one, if we skip it).
+        run: bun run tauri build --debug --no-bundle
