@@ -63,30 +63,26 @@ git2 = { version = "0.19", default-features = false }
 rusqlite = { version = "0.32", features = ["bundled"] }
 
 # Logging
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Desktop (Tauri)
 tauri = { version = "2.1", features = [] }
 tauri-build = { version = "2.0", features = [] }
-tauri-plugin-shell = "2.0"
 tauri-plugin-dialog = "2.0"
 tauri-plugin-global-shortcut = "2.0"
 tauri-plugin-deep-link = "2.0"
 tauri-plugin-notification = "2.0"
 tauri-plugin-opener = "2.0"
-tauri-plugin-updater = "2.0"
-tauri-plugin-process = "2.0"
 sentry = { version = "0.34", features = ["rustls", "backtrace", "panic"] }
 notify = "6"
 notify-debouncer-mini = "0.4"
 
 # Internal crates
-vobes-core = { path = "crates/vobes-core", version = "0.1.5" }
-vobes-scan = { path = "crates/vobes-scan", version = "0.1.5" }
-vobes-git = { path = "crates/vobes-git", version = "0.1.5" }
-vobes-store = { path = "crates/vobes-store", version = "0.1.5" }
-vobes-config = { path = "crates/vobes-config", version = "0.1.5" }
-vobes-cli = { path = "crates/vobes-cli", version = "0.1.5" }
+vobes-core = { path = "crates/vobes-core", version = "0.1.6" }
+vobes-scan = { path = "crates/vobes-scan", version = "0.1.6" }
+vobes-git = { path = "crates/vobes-git", version = "0.1.6" }
+vobes-store = { path = "crates/vobes-store", version = "0.1.6" }
+vobes-config = { path = "crates/vobes-config", version = "0.1.6" }
+vobes-cli = { path = "crates/vobes-cli", version = "0.1.6" }
 
 [profile.release]
 opt-level = 3
