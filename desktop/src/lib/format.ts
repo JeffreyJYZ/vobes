@@ -14,19 +14,21 @@ export function relativeTime(ts: string | null | undefined): string {
 	return `${Math.floor(s / 31536000)}y ago`
 }
 
+function orLabel(v: string | null | undefined, fallback: string): string {
+	if (v?.trim()) return v
+	return fallback
+}
+
 export function languageLabel(lang: string | null | undefined): string {
-	if (lang?.trim()) return lang
-	return "Vanilla"
+	return orLabel(lang, "Vanilla")
 }
 
 export function frameworkLabel(fw: string | null | undefined): string {
-	if (fw?.trim()) return fw
-	return "Vanilla"
+	return orLabel(fw, "Vanilla")
 }
 
 export function packageManagerLabel(pm: string | null | undefined): string {
-	if (pm?.trim()) return pm
-	return "None"
+	return orLabel(pm, "None")
 }
 
 export function isMac(): boolean {

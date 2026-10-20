@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { open as openDialog } from "@tauri-apps/plugin-dialog";
 	import { onMount } from "svelte";
+	import * as actions from "../lib/actions";
 	import {
 		applyConfig,
 		config,
 		configPath,
-		doScan,
+		doSync,
 		errorString,
 		loadConfig,
 		onboardingDone,
@@ -35,18 +35,8 @@
 	});
 
 	async function pickRoot() {
-		try {
-			const picked = await openDialog({
-				directory: true,
-				multiple: false,
-			});
-			if (picked) {
-				const p = String(picked);
-				if (!roots.includes(p)) roots = [...roots, p];
-			}
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		}
+		const p = await actions.pickDir();
+		if (p && !roots.includes(p)) roots = [...roots, p];
 	}
 
 	function removeRoot(r: string) {
@@ -72,7 +62,7 @@
 			scanError = "";
 			try {
 				await refresh();
-				await doScan();
+				await doSync();
 			} catch (e) {
 				scanError = errorString(e);
 			} finally {

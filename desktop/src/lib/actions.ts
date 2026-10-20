@@ -1,8 +1,25 @@
-import { ask } from "@tauri-apps/plugin-dialog";
+import { ask, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { get } from "svelte/store";
 import * as api from "./api";
-import { errorString, pushToast, refresh, selectedVobe } from "./stores";
+import {
+	errorString,
+	missingVobes,
+	pushToast,
+	refresh,
+	selectedVobe,
+} from "./stores";
 import type { Vobe } from "./types";
+
+/// Pick one directory; toasts on dialog failure. Null when cancelled.
+export async function pickDir(): Promise<string | null> {
+	try {
+		const picked = await openDialog({ directory: true, multiple: false });
+		return picked ? String(picked) : null;
+	} catch (e) {
+		pushToast({ kind: "error", message: errorString(e) });
+		return null;
+	}
+}
 
 /// Open the vobe's directory in the default editor. Resolves the user's
 /// stored default from localStorage via the Projects view's local
@@ -71,6 +88,43 @@ export async function removeVobe(v: Vobe) {
 	try {
 		await api.removeVobe(v.name);
 		await refresh({ silent: true });
+	} catch (e) {
+		pushToast({ kind: "error", message: errorString(e) });
+	}
+}
+
+/// Untrack a vobe whose tracked path is gone. No confirm: the files are
+/// already gone, so this only drops a dead row.
+export async function untrackMissing(v: Vobe) {
+	try {
+		await api.removeVobe(v.name);
+		if (get(selectedVobe)?.id === v.id) selectedVobe.set(null);
+		await refresh({ silent: true });
+	} catch (e) {
+		pushToast({ kind: "error", message: errorString(e) });
+	}
+}
+
+/// Confirm then untrack every vobe whose path is gone. Guarded because
+/// an unmounted volume reads as "missing" for all of its projects.
+export async function purgeMissing() {
+	const n = get(missingVobes).length;
+	const ok = await ask(
+		`Untrack ${n} vobe${n === 1 ? "" : "s"} whose path no longer exists? Files on disk are untouched — but an unmounted drive also reads as missing.`,
+		{ title: "Vobes", kind: "warning" },
+	);
+	if (!ok) return;
+	try {
+		const gone = await api.purgeMissing();
+		const cur = get(selectedVobe);
+		if (cur && get(missingVobes).some((v) => v.id === cur.id)) {
+			selectedVobe.set(null);
+		}
+		await refresh({ silent: true });
+		pushToast({
+			kind: "success",
+			message: `Untracked ${gone} missing vobe${gone === 1 ? "" : "s"}.`,
+		});
 	} catch (e) {
 		pushToast({ kind: "error", message: errorString(e) });
 	}

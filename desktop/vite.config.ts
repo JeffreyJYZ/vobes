@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { readFileSync } from "node:fs";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
@@ -25,6 +26,10 @@ const config = defineConfig({
 			process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
 		minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
 		sourcemap: !!process.env.TAURI_ENV_DEBUG,
+	},
+	test: {
+		environment: "node",
+		include: ["src/**/*.test.ts"],
 	},
 });
 

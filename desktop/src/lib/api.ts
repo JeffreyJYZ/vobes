@@ -43,10 +43,6 @@ export async function vobeActivity(
 	})
 }
 
-export async function scan(): Promise<number> {
-	return invoke<number>("scan")
-}
-
 export async function sync(): Promise<[number, number]> {
 	return invoke<[number, number]>("sync")
 }
@@ -154,6 +150,18 @@ export async function removeSavedFilter(id: string): Promise<void> {
 
 export async function listSnapshots(): Promise<SnapshotInfo[]> {
 	return invoke<SnapshotInfo[]>("list_snapshots")
+}
+
+export async function listMissing(): Promise<Vobe[]> {
+	return invoke<Vobe[]>("missing_vobes")
+}
+
+export async function purgeMissing(): Promise<number> {
+	return invoke<number>("purge_missing")
+}
+
+export async function factoryReset(): Promise<void> {
+	return invoke<void>("factory_reset")
 }
 
 export async function restoreSnapshot(path: string): Promise<void> {

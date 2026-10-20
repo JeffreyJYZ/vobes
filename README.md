@@ -169,31 +169,25 @@ env-var approach above is the safer default.)
 
 ### Auto-update
 
-The updater is wired (`tauri-plugin-updater` + `createUpdaterArtifacts: true`,
-endpoint pointing at GitHub `latest.json`) but **inert** until a signing key
-is configured. Without it, every release fails signature verification and
-the running app silently skips the update.
+**Not yet implemented.** Auto-update is planned but not wired: there is no
+`tauri-plugin-updater` dependency, no `updater` block in
+`desktop/src-tauri/tauri.conf.json`, and no `latest.json` endpoint yet.
+Releases publish as draft GitHub releases; users must install manually.
 
-One-time setup:
+The intended path, when work begins:
 
-1. Generate a keypair (private key stays local; public key goes in the repo):
+1. Add `tauri-plugin-updater` (Rust) and `@tauri-apps/plugin-updater` (JS),
+   and a `plugins.updater` block in `tauri.conf.json` with a public key and
+   a `latest.json` endpoint.
+2. Generate a signing keypair:
    ```bash
    pnpm tauri signer generate -w ~/.tauri/vobes.key
    ```
-2. Paste the contents of `vobes.key.pub` into `plugins.updater.pubkey` in
-   `desktop/src-tauri/tauri.conf.json` (replaces the
-   `REPLACE_WITH_TAURI_SIGNER_GENERATE_OUTPUT` placeholder).
-3. Add the private key as a GitHub Actions secret:
-   ```bash
-   gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/vobes.key
-   # optional, only if you set a password during generate:
-   gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD <password>
-   ```
-   The release workflow already reads `secrets.TAURI_SIGNING_PRIVATE_KEY`;
-   uncomment the env lines in `.github/workflows/release.yml` when ready.
+3. Set the GitHub Actions secrets `TAURI_SIGNING_PRIVATE_KEY` (and
+   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if a password was used); the release
+   workflow has the corresponding env lines ready to uncomment.
 
-Until then, builds still work, releases still publish as drafts, but users
-on older versions get no update prompt.
+Until this is done, the app does not check for or prompt updates.
 
 ### Crash reporting
 

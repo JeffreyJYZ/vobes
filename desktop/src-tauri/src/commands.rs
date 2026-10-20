@@ -25,7 +25,7 @@ pub async fn list_vobes(state: State<'_, Arc<DesktopCtx>>) -> Result<Vec<VobeDto
 /// Fetch a single vobe by name or path.
 #[tauri::command]
 pub async fn get_vobe(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result<Option<VobeDto>> {
-    Ok(lookup_vobe(&state.store, &name)?.map(|v| VobeDto::from(&v)))
+    Ok(lookup_vobe(state.store.as_ref(), &name)?.map(|v| VobeDto::from(&v)))
 }
 
 /// Recent activity across all vobes. If `actor` is supplied, only
@@ -53,38 +53,6 @@ pub async fn vobe_activity(
     let id = vobes_core::VobeId::from_string(vobe_id);
     let events = state.store.vobe_activity(&id, limit)?;
     Ok(events.iter().map(ActivityDto::from).collect())
-}
-
-/// Scan configured roots, add newly discovered vobes.
-#[tauri::command]
-pub async fn scan(state: State<'_, Arc<DesktopCtx>>) -> Result<usize> {
-    let _guard = state
-        .scan_lock
-        .lock()
-        .map_err(|e| vobes_core::Error::internal(format!("scan lock: {e}")))?;
-    let config = state.config_snapshot();
-    let scanner = state.scanner_snapshot();
-    let mut found = 0usize;
-    for root in config.resolved_roots() {
-        if !root.exists() {
-            continue;
-        }
-        let pairs = scanner.scan(&root)?;
-        for (path, detection) in pairs {
-            let path = absolute_normalized(&path);
-            if state.store.get_vobe_by_path(&path)?.is_some() {
-                continue;
-            }
-            let vobe = vobe_from_detection(&path, &detection)?;
-            state.store.upsert_vobe(&vobe)?;
-            state.store.record_activity(
-                &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Scanned)
-                    .with_detail("desktop scan"),
-            )?;
-            found += 1;
-        }
-    }
-    Ok(found)
 }
 
 /// Dangerous: purge every vobe and all activity, then re-scan from scratch.
@@ -186,7 +154,7 @@ pub async fn add_vobe(state: State<'_, Arc<DesktopCtx>>, path: String) -> Result
 /// Remove a vobe.
 #[tauri::command]
 pub async fn remove_vobe(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result<()> {
-    let Some(vobe) = lookup_vobe(&state.store, &name)? else {
+    let Some(vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
         return Err(vobes_core::Error::not_found(name));
     };
     state.store.delete_vobe(&vobe.id)?;
@@ -196,7 +164,7 @@ pub async fn remove_vobe(state: State<'_, Arc<DesktopCtx>>, name: String) -> Res
 /// Mark opened + record activity (editor launch handled by frontend via shell plugin).
 #[tauri::command]
 pub async fn open_vobe(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result<()> {
-    let Some(mut vobe) = lookup_vobe(&state.store, &name)? else {
+    let Some(mut vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
         return Err(vobes_core::Error::not_found(name));
     };
     vobe.touch_opened();
@@ -293,7 +261,7 @@ pub async fn save_config(
             .scanner
             .lock()
             .map_err(|e| vobes_core::Error::internal(format!("scanner lock: {e}")))?;
-        let scanner: Arc<dyn vobes_scan::Scanner> = Arc::new(
+        let scanner: Arc<vobes_scan::DefaultScanner> = Arc::new(
             vobes_scan::DefaultScanner::with_standard_detectors()
                 .with_extra_excludes(new_config.scan.exclude.clone())
                 .with_max_depth(new_config.scan.max_depth)
@@ -319,19 +287,11 @@ pub async fn save_config(
 /// Reveal the vobe's path in the OS file manager.
 #[tauri::command]
 pub async fn reveal_in_finder(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result<()> {
-    let Some(vobe) = lookup_vobe(&state.store, &name)? else {
+    let Some(vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
         return Err(vobes_core::Error::not_found(name));
     };
     crate::platform::reveal(&vobe.path)?;
     Ok(())
-}
-
-/// Copy a string to the system clipboard. No-op on the backend; the
-/// frontend can also use `navigator.clipboard`, but a Tauri command
-/// keeps the API uniform and avoids browser quirks in WebView2.
-#[tauri::command]
-pub async fn copy_to_clipboard(text: String) -> Result<usize> {
-    Ok(text.len())
 }
 
 /// Update a vobe's `notes` field. Returns the refreshed vobe.
@@ -341,7 +301,7 @@ pub async fn save_notes(
     name: String,
     notes: Option<String>,
 ) -> Result<VobeDto> {
-    let Some(mut vobe) = lookup_vobe(&state.store, &name)? else {
+    let Some(mut vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
         return Err(vobes_core::Error::not_found(name));
     };
     vobe.notes = notes.filter(|s| !s.is_empty());
@@ -351,11 +311,7 @@ pub async fn save_notes(
 
 /// Set the "pinned" flag for a vobe. Returned by `list_vobes` as a hint.
 #[tauri::command]
-pub async fn set_pinned(
-    state: State<'_, Arc<DesktopCtx>>,
-    id: String,
-    pinned: bool,
-) -> Result<()> {
+pub async fn set_pinned(state: State<'_, Arc<DesktopCtx>>, id: String, pinned: bool) -> Result<()> {
     let id = VobeId::from_string(id);
     let Some(mut vobe) = state.store.get_vobe(&id)? else {
         return Err(vobes_core::Error::not_found(id.to_string()));
@@ -374,7 +330,7 @@ pub async fn set_tags(
     name: String,
     tags: Vec<String>,
 ) -> Result<VobeDto> {
-    let Some(mut vobe) = lookup_vobe(&state.store, &name)? else {
+    let Some(mut vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
         return Err(vobes_core::Error::not_found(name));
     };
     let cleaned: Vec<String> = tags
@@ -396,7 +352,7 @@ pub async fn read_readme(
     state: State<'_, Arc<DesktopCtx>>,
     name: String,
 ) -> Result<Option<String>> {
-    let Some(vobe) = lookup_vobe(&state.store, &name)? else {
+    let Some(vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
         return Err(vobes_core::Error::not_found(name));
     };
     for candidate in [
@@ -438,7 +394,7 @@ pub struct TodoHit {
 /// directories. Best-effort, not a full indexer.
 #[tauri::command]
 pub async fn scrape_todos(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result<Vec<TodoHit>> {
-    let Some(vobe) = lookup_vobe(&state.store, &name)? else {
+    let Some(vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
         return Err(vobes_core::Error::not_found(name));
     };
     let mut out: Vec<TodoHit> = Vec::new();
@@ -554,7 +510,7 @@ pub struct ContextPack {
 /// Build a paste-ready context pack for an agent.
 #[tauri::command]
 pub async fn context_pack(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result<ContextPack> {
-    let Some(vobe) = lookup_vobe(&state.store, &name)? else {
+    let Some(vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
         return Err(vobes_core::Error::not_found(name));
     };
     let id = vobes_core::VobeId::from_string(vobe.id.as_str().to_string());
@@ -725,60 +681,16 @@ pub async fn delete_snapshot(path: String) -> Result<()> {
         .map_err(|e| vobes_core::Error::storage(format!("delete snapshot: {e}")))
 }
 
-/// Terminal app descriptor surfaced to the frontend for the
-/// "Open in terminal" selector on the Projects detail view.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct TerminalAppDto {
-    pub id: String,
-    pub label: String,
-    pub is_default: bool,
-}
-
-impl From<&crate::platform::TerminalApp> for TerminalAppDto {
-    fn from(t: &crate::platform::TerminalApp) -> Self {
-        Self {
-            id: t.id.clone(),
-            label: t.label.clone(),
-            is_default: t.is_default,
-        }
-    }
-}
-
-/// Editor app descriptor surfaced to the frontend for the
-/// "Open in editor" selector on the Projects detail view.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct EditorAppDto {
-    pub id: String,
-    pub label: String,
-    pub is_default: bool,
-}
-
-impl From<&crate::platform::EditorApp> for EditorAppDto {
-    fn from(e: &crate::platform::EditorApp) -> Self {
-        Self {
-            id: e.id.clone(),
-            label: e.label.clone(),
-            is_default: e.is_default,
-        }
-    }
-}
-
 /// List terminal emulators installed on this machine.
 #[tauri::command]
-pub async fn list_terminals() -> Result<Vec<TerminalAppDto>> {
-    Ok(crate::platform::list_terminals()
-        .iter()
-        .map(TerminalAppDto::from)
-        .collect())
+pub async fn list_terminals() -> Result<Vec<crate::platform::TerminalApp>> {
+    Ok(crate::platform::list_terminals())
 }
 
 /// List editors installed on this machine.
 #[tauri::command]
-pub async fn list_editors() -> Result<Vec<EditorAppDto>> {
-    Ok(crate::platform::list_editors()
-        .iter()
-        .map(EditorAppDto::from)
-        .collect())
+pub async fn list_editors() -> Result<Vec<crate::platform::EditorApp>> {
+    Ok(crate::platform::list_editors())
 }
 
 /// Spawn the named terminal at the vobe's path. If `app` is `None`,
@@ -789,7 +701,7 @@ pub async fn open_in_terminal(
     name: String,
     app: Option<String>,
 ) -> Result<()> {
-    let Some(vobe) = lookup_vobe(&state.store, &name)? else {
+    let Some(vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
         return Err(vobes_core::Error::not_found(name));
     };
     crate::platform::open_terminal_with(&vobe.path, app.as_deref())?;
@@ -809,7 +721,7 @@ pub async fn open_in_editor(
     name: String,
     app: Option<String>,
 ) -> Result<()> {
-    let Some(vobe) = lookup_vobe(&state.store, &name)? else {
+    let Some(vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
         return Err(vobes_core::Error::not_found(name));
     };
     crate::platform::open_editor(&vobe.path, app.as_deref())?;
@@ -875,4 +787,48 @@ pub mod shared {
         }
         Ok(None)
     }
+}
+
+/// List vobes whose tracked path no longer exists on disk. Shown in the
+/// sidebar "Missing" section so the user can review and bulk-delete.
+#[tauri::command]
+pub async fn missing_vobes(state: State<'_, Arc<DesktopCtx>>) -> Result<Vec<VobeDto>> {
+    let vobes = state.store.list_vobes(&Filter::all(), Sort::Name)?;
+    Ok(vobes
+        .iter()
+        .filter(|v| !v.path.exists())
+        .map(VobeDto::from)
+        .collect())
+}
+
+/// Delete every vobe whose path no longer exists on disk. Returns the
+/// count removed. The sidebar "Missing" section uses this for its
+/// "Remove all" affordance.
+#[tauri::command]
+pub async fn purge_missing(state: State<'_, Arc<DesktopCtx>>) -> Result<usize> {
+    let vobes = state.store.list_vobes(&Filter::all(), Sort::Name)?;
+    let mut n = 0usize;
+    for v in vobes {
+        if !v.path.exists() {
+            state.store.delete_vobe(&v.id)?;
+            n += 1;
+        }
+    }
+    Ok(n)
+}
+
+/// Wipe everything: database, config, snapshots. Returns to a
+/// first-launch state. The user has to confirm via the Settings UI
+/// before this is called.
+#[tauri::command]
+pub async fn factory_reset(state: State<'_, Arc<DesktopCtx>>) -> Result<()> {
+    state.store.purge_all()?;
+    let cfg = vobes_config::config_path();
+    if let Some(p) = cfg {
+        let _ = std::fs::remove_file(&p);
+    }
+    if let Some(snap_dir) = vobes_config::snapshots_dir() {
+        let _ = std::fs::remove_dir_all(&snap_dir);
+    }
+    Ok(())
 }

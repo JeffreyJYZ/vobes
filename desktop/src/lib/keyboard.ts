@@ -64,7 +64,7 @@ export function matchShortcut(combo: ShortcutCombo, e: KeyboardEvent): boolean {
 	return e.key.toLowerCase() === want.key
 }
 
-export function comboLabel(combo: ShortcutCombo): string {
+function comboLabel(combo: ShortcutCombo): string {
 	const parts: string[] = []
 	const want = comboToEvent(combo)
 	if (want.mod) parts.push(META ? "⌘" : "Ctrl")
@@ -75,7 +75,7 @@ export function comboLabel(combo: ShortcutCombo): string {
 }
 
 /** Build a `Shortcut` from a combo + label parts. */
-export function defineShortcut(
+function defineShortcut(
 	id: string,
 	description: string,
 	combo: ShortcutCombo,
@@ -107,14 +107,9 @@ export const shortcuts: Shortcut[] = [
 	defineShortcut("projects", "Go to projects", { kind: "key", key: "2" }),
 	defineShortcut("activity", "Go to activity", { kind: "key", key: "3" }),
 	defineShortcut("settings", "Go to settings", { kind: "key", key: "4" }),
-	defineShortcut("scan", "Scan for new vobes", {
+	defineShortcut("refresh", "Refresh vobes", {
 		kind: "key",
 		key: "r",
-		mod: true,
-	}),
-	defineShortcut("sync", "Sync git state", {
-		kind: "key",
-		key: "s",
 		mod: true,
 	}),
 	defineShortcut("up", "Move up", { kind: "key", key: "arrowup" }),

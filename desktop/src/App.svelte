@@ -13,7 +13,7 @@
 		addSavedFilter,
 		applyTheme,
 		config,
-		doScan,
+		doSync,
 		effectiveTheme,
 		helpOpen,
 		loadConfig,
@@ -247,9 +247,9 @@
 			view.set("settings");
 			return;
 		}
-		if (matchShortcut(shortcuts.find((s) => s.id === "scan")!.combo, e)) {
+		if (matchShortcut(shortcuts.find((s) => s.id === "refresh")!.combo, e)) {
 			e.preventDefault();
-			doScan();
+			doSync();
 			return;
 		}
 	}

@@ -4,7 +4,14 @@
 // stay declarative. Stores are plain `writable`s, no SvelteKit magic —
 // the app is a single window.
 
-import { derived, get, type Readable, writable } from "svelte/store"
+import { ask } from "@tauri-apps/plugin-dialog"
+import {
+	derived,
+	get,
+	type Readable,
+	type Writable,
+	writable,
+} from "svelte/store"
 import * as api from "./api"
 import type {
 	ActivityEvent,
@@ -26,17 +33,22 @@ export const vobes = writable<Vobe[]>([])
 export const activity = writable<ActivityEvent[]>([])
 export const lastRefreshed = writable<number>(0)
 export const scanning = writable<boolean>(false)
+export const missingVobes = writable<Vobe[]>([])
 
 export async function refresh(opts: { silent?: boolean } = {}): Promise<void> {
 	if (get(scanning)) return
 	if (!opts.silent) scanning.set(true)
 	try {
-		const [vs, acts] = await Promise.all([
+		const [vs, acts, gone] = await Promise.all([
 			api.listVobes(),
 			api.recentActivity(200),
+			// A failed stat sweep must never break the dashboard —
+			// the Missing section is advisory.
+			api.listMissing().catch(() => [] as Vobe[]),
 		])
 		vobes.set(vs)
 		activity.set(acts)
+		missingVobes.set(gone)
 		lastRefreshed.set(Date.now())
 		// If the user has any tracked vobes, onboarding is effectively done.
 		if (vs.length > 0 && !get(onboardingDone)) {
@@ -89,26 +101,6 @@ async function notifyBehindSummary(allVobes: Vobe[], _recentEvents: number) {
 	}
 }
 
-export async function doScan(): Promise<void> {
-	scanning.set(true)
-	try {
-		const found = await api.scan()
-		pushToast({
-			kind: "success",
-			message:
-				found > 0
-					? `Found ${found} new vobe${found === 1 ? "" : "s"}.`
-					: "No new vobes.",
-		})
-		await refresh({ silent: true })
-		lastRefreshed.set(Date.now())
-	} catch (e) {
-		pushToast({ kind: "error", message: errorString(e) })
-	} finally {
-		scanning.set(false)
-	}
-}
-
 export async function doSync(): Promise<void> {
 	scanning.set(true)
 	try {
@@ -126,29 +118,41 @@ export async function doSync(): Promise<void> {
 	}
 }
 
-export async function doReset(): Promise<void> {
-	// Destructive: purge every vobe + all activity, then re-scan
-	// from scratch. The UI confirms before calling — the backend
-	// does not prompt.
-	scanning.set(true)
-	try {
-		const found = await api.resetAndRescan()
-		pushToast({
-			kind: "success",
-			message: `Reset complete: ${found} vobe${found === 1 ? "" : "s"} re-discovered.`,
-		})
-		await refresh({ silent: true })
-		lastRefreshed.set(Date.now())
-	} catch (e) {
-		pushToast({ kind: "error", message: errorString(e) })
-	} finally {
-		scanning.set(false)
-	}
-}
-
 // ---- View + UI state ----
 
-export const view = writable<ViewId>("dashboard")
+const viewStore = writable<ViewId>("dashboard")
+
+/// True while Settings holds an unsaved draft. The view transition guard
+/// reads it so leaving Settings with edits warns instead of dropping them.
+export const settingsDirty = writable<boolean>(false)
+
+/// View navigation with one rule: leaving Settings while its draft is
+/// unsaved asks first. A store `set` can't await a dialog, so a blocked
+/// switch is refused synchronously and applied only after confirmation —
+/// every existing `view.set(...)` call site keeps working unchanged.
+export const view: Writable<ViewId> = {
+	subscribe: viewStore.subscribe,
+	set(next) {
+		if (
+			next !== "settings" &&
+			get(viewStore) === "settings" &&
+			get(settingsDirty)
+		) {
+			void ask("You have unsaved settings. Leave without saving?", {
+				title: "Vobes",
+				kind: "warning",
+			}).then((ok) => {
+				if (ok) viewStore.set(next)
+			})
+			return
+		}
+		viewStore.set(next)
+	},
+	update(fn) {
+		view.set(fn(get(viewStore)))
+	},
+}
+
 export const selectedVobe = writable<Vobe | null>(null)
 export const searchQuery = writable<string>("")
 export const sortKey = writable<SortKey>("last_modified")
@@ -165,17 +169,9 @@ export function openPalette() {
 export function closePalette() {
 	palette.set({ mode: "closed" })
 }
-export function togglePalette() {
-	palette.update((p) => ({
-		mode: p.mode === "closed" ? "default" : "closed",
-	}))
-}
 
 // ---- Shortcut help ----
 export const helpOpen = writable<boolean>(false)
-export function toggleHelp() {
-	helpOpen.update((v) => !v)
-}
 
 // ---- Onboarding ----
 export const onboardingDone = writable<boolean>(
@@ -280,10 +276,15 @@ export const attentionCount: Readable<number> = derived(vobes, ($v) => {
 })
 
 export const visibleVobes: Readable<Vobe[]> = derived(
-	[vobes, searchQuery, sortKey],
-	([$vobes, $q, $sort]) => {
+	[vobes, missingVobes, searchQuery, sortKey],
+	([$vobes, $missing, $q, $sort]) => {
 		const parsed = parseQuery($q)
-		let arr = $vobes.filter((v) => vobeMatches(v, parsed))
+		// Missing vobes live in the sidebar review section, not as dead
+		// cards on the dashboard.
+		const gone = new Set($missing.map((v) => v.id))
+		const arr = $vobes.filter(
+			(v) => !gone.has(v.id) && vobeMatches(v, parsed),
+		)
 		return [...arr].sort((a, b) => sortVobe(a, b, $sort))
 	},
 )

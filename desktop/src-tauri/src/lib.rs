@@ -22,14 +22,11 @@ pub fn run() {
     let _sentry = init_sentry();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let ctx = Arc::new(DesktopCtx::load());
             app.manage(ctx.clone());
@@ -78,9 +75,11 @@ pub fn run() {
             commands::get_vobe,
             commands::recent_activity,
             commands::vobe_activity,
-            commands::scan,
             commands::reset_and_rescan,
             commands::sync,
+            commands::missing_vobes,
+            commands::purge_missing,
+            commands::factory_reset,
             commands::add_vobe,
             commands::remove_vobe,
             commands::open_vobe,
@@ -89,7 +88,6 @@ pub fn run() {
             commands::save_config,
             commands::open_in_terminal,
             commands::reveal_in_finder,
-            commands::copy_to_clipboard,
             commands::save_notes,
             commands::set_pinned,
             commands::set_tags,
@@ -105,7 +103,6 @@ pub fn run() {
             commands::delete_snapshot,
             commands::list_terminals,
             commands::list_editors,
-            commands::open_in_terminal,
             commands::open_in_editor,
         ])
         .run(tauri::generate_context!())

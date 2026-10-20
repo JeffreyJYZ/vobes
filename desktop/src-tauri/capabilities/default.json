@@ -18,11 +18,6 @@
 		"dialog:allow-ask",
 		"dialog:allow-confirm",
 
-		"shell:default",
-		"shell:allow-open",
-		"shell:allow-execute",
-		"shell:allow-spawn",
-
 		"notification:default",
 		"notification:allow-notify",
 		"notification:allow-is-permission-granted",
@@ -32,8 +27,6 @@
 		"opener:allow-open-path",
 		"opener:allow-open-url",
 
-		"deep-link:default",
-		"updater:default",
-		"process:default"
+		"deep-link:default"
 	]
 }

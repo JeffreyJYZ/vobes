@@ -8,7 +8,6 @@
 	import {
 		addSavedFilter,
 		closePalette,
-		doScan,
 		doSync,
 		errorString,
 		helpOpen,
@@ -62,20 +61,14 @@
 			run: () => view.set("settings"),
 		},
 		{
-			id: "action.scan",
-			label: "Discover new vobes",
+			id: "action.refresh",
+			label: "Refresh vobes",
 			hint: "⌘R",
-			run: doScan,
-		},
-		{
-			id: "action.sync",
-			label: "Refresh all vobes",
-			hint: "⌘S",
 			run: doSync,
 		},
 		{
-			id: "action.refresh",
-			label: "Refresh vobes from cache",
+			id: "action.refresh_cache",
+			label: "Reload from cache",
 			run: () => refresh(),
 		},
 		{

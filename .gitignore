@@ -34,3 +34,6 @@ vite.config.ts.timestamp-*
 
 # Local-only scratch / planning (not for the repo)
 ignored/
+
+# Local agent-tool scratch
+.commandcode/

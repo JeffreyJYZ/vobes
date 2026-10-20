@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Vobes",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "identifier": "land.jyz.vobes",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -48,15 +48,6 @@
     "deep-link": {
       "desktop": {
         "schemes": ["vobes"]
-      }
-    },
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZBNzY4QTBDNzEwMDI4ODQKUldTRUtBQnhESXAyYXR6RkNjYnNjeU9OdVZ0akxVUE5LWThEcFNZSVdUdGtVMHZnTzFuZGFMWTgK",
-      "endpoints": [
-        "https://github.com/JeffreyJYZ/vobes/releases/latest/download/latest.json"
-      ],
-      "windows": {
-        "installMode": "passive"
       }
     }
   }

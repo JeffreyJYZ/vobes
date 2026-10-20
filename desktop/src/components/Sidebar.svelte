@@ -1,22 +1,27 @@
 <script lang="ts">
+	import * as actions from "../lib/actions";
 	import {
 		activity,
 		allTags,
 		attentionCount,
+		missingVobes,
 		onboardingDone,
 		removeSavedFilter,
 		savedFilters,
 		searchQuery,
+		selectedVobe,
 		view,
 		vobes,
 	} from "../lib/stores";
-	import type { ViewId } from "../lib/types";
+	import type { ViewId, Vobe } from "../lib/types";
 
 	const items: { id: ViewId; label: string }[] = [
 		{ id: "dashboard", label: "Dashboard" },
 		{ id: "activity", label: "Activity" },
 		{ id: "settings", label: "Settings" },
 	];
+
+	$: pinnedVobes = $vobes.filter((v) => v.pinned);
 
 	function setView(id: ViewId) {
 		view.set(id);
@@ -25,6 +30,11 @@
 	function applyFilter(q: string) {
 		view.set("dashboard");
 		searchQuery.set(q);
+	}
+
+	function openPinned(v: Vobe) {
+		selectedVobe.set(v);
+		view.set("projects");
 	}
 </script>
 
@@ -65,6 +75,67 @@
 			</button>
 		{/each}
 	</nav>
+
+	{#if pinnedVobes.length > 0}
+		<div class="saved">
+			<div class="saved-head">Pinned</div>
+			{#each pinnedVobes as v (v.id)}
+				<div class="saved-row">
+					<button
+						class="saved-btn pinned-btn"
+						type="button"
+						on:click={() => openPinned(v)}
+						title={`Open ${v.name}`}
+					>
+						<span class="pinned-txt">
+							<span class="lbl">{v.name}</span>
+							<span class="hint">{v.path}</span>
+						</span>
+					</button>
+					<button
+						class="saved-x"
+						type="button"
+						on:click={() => actions.togglePin(v).catch(() => {})}
+						aria-label={`Unpin ${v.name}`}
+						title="Unpin">×</button
+					>
+				</div>
+			{/each}
+		</div>
+	{/if}
+
+	{#if $missingVobes.length > 0}
+		<div class="saved missing">
+			<div class="saved-head with-action">
+				<span>Missing</span>
+				<button
+					class="head-action"
+					type="button"
+					on:click={() => actions.purgeMissing()}
+					title="Untrack every vobe whose path is gone"
+				>
+					Remove all
+				</button>
+			</div>
+			{#each $missingVobes as v (v.id)}
+				<div class="saved-row">
+					<span class="saved-btn missing-btn" title={v.path}>
+						<span class="pinned-txt">
+							<span class="lbl">{v.name}</span>
+							<span class="hint">{v.path}</span>
+						</span>
+					</span>
+					<button
+						class="saved-x"
+						type="button"
+						on:click={() => actions.untrackMissing(v)}
+						aria-label={`Untrack ${v.name}`}
+						title="Untrack">×</button
+					>
+				</div>
+			{/each}
+		</div>
+	{/if}
 
 	{#if $allTags.length > 0}
 		<div class="saved">
@@ -212,6 +283,7 @@
 	}
 	.saved-btn {
 		flex: 1;
+		min-width: 0;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -236,6 +308,16 @@
 	.saved-btn .hint {
 		color: var(--fg-faint);
 		font-size: 11px;
+	}
+	.pinned-txt {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.pinned-txt .hint {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.saved-x {
 		background: transparent;
@@ -272,6 +354,36 @@
 	}
 	.tag-btn .tag-hash {
 		color: var(--fg-faint);
+	}
+	.saved.missing {
+		border-top-color: color-mix(in srgb, var(--warn) 32%, var(--border));
+	}
+	.saved-head.with-action {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.head-action {
+		background: transparent;
+		border: none;
+		padding: 0 6px;
+		color: var(--fg-faint);
+		font: inherit;
+		font-size: 11px;
+		font-weight: 600;
+		cursor: pointer;
+		border-radius: 4px;
+	}
+	.head-action:hover {
+		color: var(--danger);
+	}
+	.missing-btn {
+		cursor: default;
+		color: var(--fg-muted);
+	}
+	.missing-btn:hover {
+		background: transparent;
 	}
 	.footer {
 		margin-top: auto;

@@ -7,7 +7,6 @@
 </script>
 
 <script lang="ts">
-	import { ask } from "@tauri-apps/plugin-dialog";
 	import * as actions from "../lib/actions";
 	import Attention from "../components/Attention.svelte";
 	import ContextMenu from "../components/ContextMenu.svelte";
@@ -17,9 +16,7 @@
 	import {
 		addSavedFilter,
 		density,
-		doScan,
 		doSync,
-		doReset,
 		lastRefreshed,
 		pushToast,
 		scanning,
@@ -27,6 +24,7 @@
 		selectedVobe,
 		sortKey,
 		view,
+		visibleVobes,
 		vobes,
 	} from "../lib/stores";
 	import type { SortKey, Vobe } from "../lib/types";
@@ -85,41 +83,7 @@
 		ctxVobe = null;
 	}
 
-	$: filtered = filterAndSort($vobes, $searchQuery, $sortKey);
-
-	function filterAndSort(all: Vobe[], q: string, key: SortKey): Vobe[] {
-		const ql = q.trim().toLowerCase();
-		let arr = all;
-		if (ql) {
-			arr = arr.filter(
-				(v) =>
-					v.name.toLowerCase().includes(ql) ||
-					(v.path ?? "").toLowerCase().includes(ql) ||
-					v.tags.some((t) => t.toLowerCase().includes(ql)) ||
-					(v.language ?? "").toLowerCase().includes(ql) ||
-					(v.framework ?? "").toLowerCase().includes(ql),
-			);
-		}
-		return [...arr].sort((a, b) => {
-			if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-			switch (key) {
-				case "name":
-					return a.name.localeCompare(b.name);
-				case "created_at":
-					return (b.created_at ?? "").localeCompare(
-						a.created_at ?? "",
-					);
-				case "last_opened":
-					return (b.last_opened ?? "").localeCompare(
-						a.last_opened ?? "",
-					);
-				default:
-					return (b.last_modified ?? "").localeCompare(
-						a.last_modified ?? "",
-					);
-			}
-		});
-	}
+	$: filtered = $visibleVobes;
 
 	function open(v: Vobe) {
 		selectedVobe.set(v);
@@ -140,10 +104,6 @@
 		{ value: "name", label: "Name" },
 		{ value: "created_at", label: "Newest" },
 	];
-
-	function _focusSearch() {
-		searchEl?.focus();
-	}
 </script>
 
 <div class="dashboard">
@@ -186,28 +146,8 @@
 			>
 				{$density === "comfy" ? "▦" : "☰"}
 			</button>
-			<button class="primary" on:click={doScan} disabled={$scanning}>
-				{$scanning ? "Scanning…" : "Discover"}
-			</button>
 			<button class="primary" on:click={doSync} disabled={$scanning}>
-				{$scanning ? "Scanning…" : "Refresh"}
-			</button>
-			<button
-				class="danger"
-				on:click={async () => {
-					const ok = await ask(
-						"Reset and re-scan? This erases every tracked vobe + all activity, then rediscovers from your roots.",
-						{ title: "Vobes", kind: "warning" },
-					);
-					if (!ok) {
-						return;
-					}
-					await doReset();
-				}}
-				disabled={$scanning}
-				title="Purge every vobe and re-scan from scratch"
-			>
-				Reset
+				{$scanning ? "Refreshing…" : "Refresh"}
 			</button>
 			<button
 				on:click={async () => {
@@ -247,7 +187,7 @@
 				Configure scan roots in <button
 					class="link"
 					on:click={() => view.set("settings")}>Settings</button
-				>, then hit <kbd>Scan</kbd>.
+				>, then hit <kbd>⌘R</kbd> or <kbd>Refresh</kbd>.
 			</p>
 		</div>
 	{:else if filtered.length === 0}

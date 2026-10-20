@@ -12,7 +12,7 @@
 // filtered out. Always pass the query lower-cased; we do the same for
 // the haystack inside.
 
-export interface FuzzyCandidate {
+interface FuzzyCandidate {
 	/** Stable id used to re-find the source object. */
 	id: string
 	/** Primary text to match against. */
@@ -23,7 +23,7 @@ export interface FuzzyCandidate {
 	data?: unknown
 }
 
-export interface FuzzyResult<T = unknown> {
+interface FuzzyResult<T = unknown> {
 	id: string
 	text: string
 	meta?: string

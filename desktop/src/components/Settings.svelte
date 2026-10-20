@@ -1,6 +1,8 @@
 <script lang="ts">
-	import { ask, open as openDialog } from "@tauri-apps/plugin-dialog";
-	import { onMount } from "svelte";
+	import { ask } from "@tauri-apps/plugin-dialog";
+	import { onDestroy, onMount } from "svelte";
+	import * as actions from "../lib/actions";
+	import * as api from "../lib/api";
 	import {
 		applyConfig,
 		config,
@@ -10,6 +12,7 @@
 		loadConfig,
 		pushToast,
 		refresh,
+		settingsDirty,
 		view,
 	} from "../lib/stores";
 	import {
@@ -33,6 +36,8 @@
 		draft = $config ? structuredClone($config) : null;
 		await loadSnapshots();
 	});
+
+	onDestroy(() => settingsDirty.set(false));
 
 	async function loadSnapshots() {
 		try {
@@ -109,22 +114,13 @@ async function restore(s: SnapshotInfo) {
 
 	$: if (draft && $config) {
 		dirty = JSON.stringify(draft) !== JSON.stringify($config);
+		settingsDirty.set(dirty);
 	}
 
 	async function pickRoot() {
-		try {
-			const picked = await openDialog({
-				directory: true,
-				multiple: false,
-			});
-			if (picked && draft) {
-				const p = String(picked);
-				if (!draft.scan.roots.includes(p)) {
-					draft.scan.roots = [...draft.scan.roots, p];
-				}
-			}
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
+		const p = await actions.pickDir();
+		if (p && draft && !draft.scan.roots.includes(p)) {
+			draft.scan.roots = [...draft.scan.roots, p];
 		}
 	}
 
@@ -156,6 +152,13 @@ async function restore(s: SnapshotInfo) {
 		} finally {
 			saving = false;
 		}
+	}
+
+	// Leaving the view must not discard edits silently — the view guard
+	// in stores asks first (settingsDirty), and the Save bar is sticky so
+	// it is always in reach.
+	async function done() {
+		view.set("dashboard");
 	}
 
 	function onRootPathKeydown(e: KeyboardEvent) {
@@ -364,8 +367,59 @@ async function restore(s: SnapshotInfo) {
 			</div>
 		</section>
 
+		<section class="block danger-zone">
+			<h3>Danger zone</h3>
+			<p class="muted small">
+				Both actions are irreversible. Reset re-scans from your roots;
+				Factory Reset wipes the database, config, and snapshots —
+				Vobes restarts as if freshly installed.
+			</p>
+			<div class="row gap">
+				<button
+					class="danger"
+					on:click={async () => {
+						const ok = await ask(
+							"Removes every vobe from Vobes (your files on disk are untouched) and rediscovers them from your scan roots. Activity history is also cleared.",
+							{ title: "Reset tracked vobes", kind: "warning" },
+						);
+						if (!ok) return;
+						try {
+							const n = await api.resetAndRescan();
+							await refresh({ silent: true });
+							pushToast({ kind: "success", message: `Reset complete: ${n} vobe${n === 1 ? "" : "s"} re-discovered.` });
+						} catch (e) {
+							pushToast({ kind: "error", message: errorString(e) });
+						}
+					}}
+				>
+					Reset tracked vobes
+				</button>
+				<button
+					class="danger"
+					on:click={async () => {
+						const ok = await ask(
+							"Deletes the database, config.toml, and all snapshots. Vobes restarts as if you just installed it.",
+							{ title: "Factory reset Vobes", kind: "warning" },
+						);
+						if (!ok) return;
+						try {
+							await api.factoryReset();
+							pushToast({ kind: "info", message: "Factory reset complete. Restart Vobes to set up again." });
+						} catch (e) {
+							pushToast({ kind: "error", message: errorString(e) });
+						}
+					}}
+				>
+					Factory reset Vobes
+				</button>
+			</div>
+		</section>
+
 		<div class="actions">
-			<button on:click={() => view.set("dashboard")}>Done</button>
+			{#if dirty}
+				<span class="unsaved">Unsaved changes</span>
+			{/if}
+			<button on:click={done}>Done</button>
 			<button class="primary" on:click={save} disabled={!dirty || saving}>
 				{saving ? "Saving…" : "Save changes"}
 			</button>
@@ -487,9 +541,40 @@ async function restore(s: SnapshotInfo) {
 	}
 	.actions {
 		display: flex;
+		align-items: center;
 		justify-content: flex-end;
 		gap: 8px;
 		margin-top: 12px;
+		position: sticky;
+		bottom: 0;
+		padding: 12px 0;
+		background: var(--bg);
+		border-top: 1px solid var(--border);
+	}
+	.unsaved {
+		margin-right: auto;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--warn);
+	}
+	.danger-zone {
+		border-color: color-mix(in srgb, var(--danger) 28%, var(--border));
+	}
+	.danger-zone h3 {
+		color: var(--danger);
+	}
+	button.danger {
+		background: var(--danger);
+		color: #fff;
+		border: none;
+		padding: 8px 14px;
+		border-radius: 8px;
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	button.danger:hover {
+		background: color-mix(in srgb, var(--danger) 88%, #000);
 	}
 	.small {
 		font-size: 12px;
