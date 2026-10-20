@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 /// Top-level config.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct Config {
     /// Scanner settings.
     pub scan: ScanConfig,
@@ -20,7 +20,7 @@ pub struct Config {
 /// opaque bytes; only the desktop UI surfaces the fields. Lives in
 /// the same `config.toml` as the rest, so dotfile-sync just works.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct DesktopConfig {
     /// Surface an OS notification when a vobe is behind upstream.
     pub notify_behind: bool,
@@ -28,7 +28,7 @@ pub struct DesktopConfig {
 
 /// Scanner settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct ScanConfig {
     /// Roots to scan. `~` expanded.
     pub roots: Vec<String>,
@@ -53,7 +53,7 @@ impl Default for ScanConfig {
 
 /// Display preferences.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
 pub struct DisplayConfig {
     /// `"auto"`, `"light"`, `"dark"`.
     pub theme: String,
@@ -75,30 +75,30 @@ impl Config {
 
     /// Load config from the given file path. If the file does not exist,
     /// returns the default config.
+    ///
+    /// Unknown keys are ignored (serde defaults, no `deny_unknown_fields`)
+    /// so a config written by an older or newer version never drops the
+    /// whole file: a single stale key used to make every setting in it
+    /// silently revert to defaults. After a successful parse the file is
+    /// rewritten in canonical shape when its content differs structurally,
+    /// so stale keys don't accumulate. Comments and ordering are left
+    /// alone (the comparison is on the parsed table, not on the text).
     pub fn load_from(path: &std::path::Path) -> Result<Self, ConfigError> {
         if !path.exists() {
             return Ok(Self::default());
         }
         let s = std::fs::read_to_string(path)
             .map_err(|e| ConfigError::Read(path.to_path_buf(), e.to_string()))?;
-        match Self::from_toml_str(&s) {
-            Ok(c) => Ok(c),
-            Err(_) => {
-                // Older configs (pre-audit) carry sections that no
-                // longer exist ([general], [git], [export]). Strip them
-                // and retry so the user's settings don't silently
-                // revert to defaults.
-                let cleaned = strip_removed_sections(&s);
-                if let Ok(c) = Self::from_toml_str(&cleaned) {
-                    if let Ok(body) = c.to_toml_string() {
-                        let _ = std::fs::write(path, body);
-                    }
-                    return Ok(c);
-                }
-                Self::from_toml_str(&s)
-                    .map_err(|e| ConfigError::Parse(path.to_path_buf(), e.to_string()))
+        let cfg: Self = Self::from_toml_str(&s)
+            .map_err(|e| ConfigError::Parse(path.to_path_buf(), e.to_string()))?;
+        if let Ok(body) = cfg.to_toml_string() {
+            let current = toml::from_str::<toml::Value>(&s).ok();
+            let canonical = toml::from_str::<toml::Value>(&body).ok();
+            if current.zip(canonical).is_some_and(|(a, b)| a != b) {
+                let _ = std::fs::write(path, body);
             }
         }
+        Ok(cfg)
     }
 
     /// Serialize to a stable, commented TOML string.
@@ -136,43 +136,6 @@ pub fn expand_home(p: &str) -> Option<PathBuf> {
     } else {
         Some(PathBuf::from(p))
     }
-}
-
-/// Strip TOML sections that the audit removed from `Config` (`general`,
-/// `git`, `export`). Lets pre-audit configs parse without forcing a
-/// hand-edit. Best-effort: matches a section header line and skips its
-/// body until the next sibling section header. Nested tables aren't
-/// supported in this config so that's fine.
-fn strip_removed_sections(s: &str) -> String {
-    const REMOVED: &[&str] = &["general", "git", "export"];
-    let mut out = String::with_capacity(s.len());
-    let mut skipping = false;
-    for line in s.lines() {
-        let trimmed = line.trim_start();
-        if skipping {
-            // A new section header ends the skipped block; process
-            // it normally (don't accumulate depth — these are flat
-            // siblings, not nested).
-            if trimmed.starts_with('[') {
-                skipping = false;
-            } else {
-                continue;
-            }
-        }
-        if let Some(rest) = trimmed.strip_prefix('[') {
-            if let Some(name) = rest.strip_suffix(']') {
-                let name = name.trim().trim_matches('"').trim_matches('\'');
-                let base = name.split('.').next().unwrap_or(name).trim();
-                if REMOVED.contains(&base) {
-                    skipping = true;
-                    continue;
-                }
-            }
-        }
-        out.push_str(line);
-        out.push('\n');
-    }
-    out
 }
 
 /// Config-level error.

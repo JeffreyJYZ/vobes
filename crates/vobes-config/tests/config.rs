@@ -24,12 +24,16 @@ max_depth = 8
 }
 
 #[test]
-fn unknown_field_is_rejected() {
+fn unknown_field_is_ignored() {
+    // A stale or mistyped key must not drop the rest of the config —
+    // one unknown field used to make every setting revert to defaults.
     let toml = r#"
 [scan]
 unknown_field = true
+max_depth = 8
 "#;
-    assert!(Config::from_toml_str(toml).is_err());
+    let c = Config::from_toml_str(toml).unwrap();
+    assert_eq!(c.scan.max_depth, 8);
 }
 
 #[test]
@@ -101,12 +105,18 @@ notify_behind = true
 }
 
 #[test]
-fn unknown_section_is_rejected() {
+fn unknown_section_is_ignored() {
+    // Sections dropped by the audit ([general], [git], [export]) must
+    // parse harmlessly instead of failing the whole file.
     let toml = r#"
 [export]
 format = "json"
+
+[scan]
+max_depth = 6
 "#;
-    assert!(Config::from_toml_str(toml).is_err());
+    let c = Config::from_toml_str(toml).unwrap();
+    assert_eq!(c.scan.max_depth, 6);
 }
 
 #[test]
@@ -127,11 +137,11 @@ fn save_to_round_trips() {
 }
 
 #[test]
-fn pre_audit_config_loads_after_stripping_removed_sections() {
-    // Pre-audit configs carried [general], [git], [export] sections.
-    // load_from should strip those silently and parse the rest, not
-    // silently fall back to defaults (which would lose the user's
-    // scan roots + depth + exclude settings).
+fn pre_audit_config_loads_and_self_heals() {
+    // Pre-audit configs carried [general], [git], [export] sections and
+    // stale fields inside surviving sections (display.date_format,
+    // desktop.launch_on_login). Both must load without losing the rest —
+    // and the file should be rewritten in canonical shape afterwards.
     let dir = std::env::temp_dir().join("vobes-config-migrate-tests");
     std::fs::create_dir_all(&dir).unwrap();
     let p = dir.join("config.toml");
@@ -145,6 +155,11 @@ exclude = ["scratch", "experiments"]
 max_depth = 4
 follow_symlinks = false
 
+[display]
+theme = "dark"
+date_format = "relative"
+default_sort = "last_modified"
+
 [git]
 cache_ttl_seconds = 60
 fetch_upstream = false
@@ -154,14 +169,29 @@ format = "json"
 
 [desktop]
 notify_behind = true
-launch_on_login = true
+launch_on_login = false
 "#;
     std::fs::write(&p, legacy).unwrap();
     let loaded = Config::load_from(&p).unwrap();
     assert_eq!(loaded.scan.max_depth, 4);
     assert!(!loaded.scan.follow_symlinks);
-    assert_eq!(loaded.scan.roots, vec!["~/dev".to_string(), "~/work".to_string()]);
+    assert_eq!(
+        loaded.scan.roots,
+        vec!["~/dev".to_string(), "~/work".to_string()]
+    );
+    assert_eq!(
+        loaded.scan.exclude,
+        vec!["scratch".to_string(), "experiments".to_string()]
+    );
+    assert_eq!(loaded.display.theme, "dark");
     assert!(loaded.desktop.notify_behind);
+
+    let rewritten = std::fs::read_to_string(&p).unwrap();
+    assert!(!rewritten.contains("[git]"), "stale section survived");
+    assert!(
+        !rewritten.contains("launch_on_login"),
+        "stale field survived"
+    );
     std::fs::remove_file(&p).ok();
     std::fs::remove_dir(&dir).ok();
 }
