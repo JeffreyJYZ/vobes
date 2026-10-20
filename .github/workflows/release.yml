@@ -54,15 +54,9 @@ jobs:
         if: matrix.platform == 'macos'
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: 11.10.0
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: desktop/pnpm-lock.yaml
+          bun-version: 1.4.3
 
       - name: install linux deps (x64)
         if: matrix.platform == 'linux'
@@ -84,7 +78,7 @@ jobs:
 
       - name: install frontend deps
         working-directory: desktop
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - uses: Swatinem/rust-cache@v2.9.2
         with:
@@ -103,8 +97,9 @@ jobs:
           # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           # Windows:
-          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Update signing — required for the in-app updater to accept a build:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           projectPath: desktop
           tagName: ${{ github.ref_name }}

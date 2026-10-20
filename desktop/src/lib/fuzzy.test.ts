@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "bun:test"
 import { fuzzy } from "./fuzzy"
 
 const mk = (text: string, meta?: string, id = text) => ({

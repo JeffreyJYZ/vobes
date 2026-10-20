@@ -87,20 +87,34 @@ jobs:
           git tag "$TAG"
           git push origin "$TAG"
 
-      - name: publish CLI/MCP crates to crates.io
+      - name: publish bumped crates to crates.io
         if: contains(steps.inspect.outputs.bumped_crates, '@')
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           set -euo pipefail
           # Desktop publish path is the tag-driven tauri-action in
-          # release.yml. This step covers per-crate bumps that don't
-          # need a tag (CLI/MCP) — see AGENTS.md.
+          # release.yml. This step covers per-crate bumps that don't need a
+          # tag — see AGENTS.md.
+          #
+          # Idempotent on purpose: a version that is already on the registry
+          # is skipped instead of failing the run (a local `cargo publish`,
+          # a re-run, or two bumped crates resolving out of order all land
+          # here). The token comes from the env var cargo reads itself; the
+          # old `--token` flag is deprecated.
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "::error::CARGO_REGISTRY_TOKEN is not set — cannot publish"
+            exit 1
+          fi
           echo "Bumped:${{ steps.inspect.outputs.bumped_crates }}"
           for spec in ${{ steps.inspect.outputs.bumped_crates }}; do
             name=${spec%@*}
             ver=${spec#*@}
             [ "$name" = "vobes-desktop" ] && continue
+            if cargo info "$name@$ver" >/dev/null 2>&1; then
+              echo "::notice::$name $ver already on crates.io; skipping."
+              continue
+            fi
             echo "Publishing $name $ver…"
-            cargo publish -p "$name" --token "$CARGO_REGISTRY_TOKEN"
+            cargo publish -p "$name"
           done

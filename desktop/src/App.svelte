@@ -7,6 +7,7 @@
 	import ShortcutHelp from "./components/ShortcutHelp.svelte";
 	import Sidebar from "./components/Sidebar.svelte";
 	import Toast from "./components/Toast.svelte";
+	import UpdateNotice from "./components/UpdateNotice.svelte";
 	import { modKeyLabel } from "./lib/format";
 	import { isTypingTarget, matchShortcut, shortcuts } from "./lib/keyboard";
 	import {
@@ -262,6 +263,9 @@
 <div class="app">
 	<Sidebar />
 	<main class="main">
+		{#if booted && !needsOnboarding}
+			<UpdateNotice />
+		{/if}
 		{#if !booted}
 			<div class="boot">
 				<div class="spinner"></div>

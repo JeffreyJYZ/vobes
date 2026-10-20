@@ -68,15 +68,9 @@ jobs:
         with:
           components: clippy
 
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: 11.10.0
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: desktop/pnpm-lock.yaml
+          bun-version: 1.4.3
 
       - name: install linux deps
         if: runner.os == 'Linux'
@@ -86,7 +80,7 @@ jobs:
 
       - name: install frontend deps
         working-directory: desktop
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - uses: Swatinem/rust-cache@v2.9.2
         with:
@@ -94,7 +88,7 @@ jobs:
 
       - name: build frontend
         working-directory: desktop
-        run: pnpm build
+        run: bun run build
 
       - name: clippy desktop
         run: cargo clippy -p vobes-desktop --all-targets -- -D warnings

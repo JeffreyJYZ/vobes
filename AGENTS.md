@@ -50,16 +50,33 @@ cargo test  --workspace --exclude vobes-desktop
 
 # desktop (CI-gated)
 cd desktop
-pnpm install --frozen-lockfile
-pnpm build                                # frontend bundle
+bun install --frozen-lockfile
+bun run build                             # frontend bundle
 cargo clippy -p vobes-desktop --all-targets -- -D warnings
 cargo build  -p vobes-desktop             # tauri shell
 
 # quick front-end type check
-npx svelte-check --tsconfig ./tsconfig.json
+bunx svelte-check --tsconfig ./tsconfig.json
+
+# front-end unit tests (bun:test, not vitest)
+bun test
 ```
 
 Always run relevant checks before claiming task done.
+
+## Auto-update
+
+- Desktop ships `tauri-plugin-updater` + `@tauri-apps/plugin-updater`; endpoint
+  is `releases/latest/download/latest.json`, pubkey lives in
+  `desktop/src-tauri/tauri.conf.json`.
+- Release builds must be signed: repo secret `TAURI_SIGNING_PRIVATE_KEY` holds
+  `~/.tauri/vobes-updater.key` (unencrypted, no password secret). Unsigned
+  builds are rejected by every installed copy.
+- **Never regenerate that keypair once a signed release is public** — installed
+  copies pin the pubkey, so a new key strands them.
+- `bump.yml` publishes bumped crates and skips versions already on the
+  registry; `release.yml` signs and uploads `latest.json` + `.sig` artifacts.
+- Secret `CARGO_REGISTRY_TOKEN` is required by `bump.yml`.
 
 ## Release flow
 

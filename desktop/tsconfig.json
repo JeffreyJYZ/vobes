@@ -14,7 +14,8 @@
 		"strict": true,
 		"sourceMap": true,
 		"esModuleInterop": true,
-		"downlevelIteration": true
+		"downlevelIteration": true,
+		"types": ["node", "bun"]
 	},
 	"include": ["src/**/*.ts", "src/**/*.svelte", "src/**/*.js"]
 }

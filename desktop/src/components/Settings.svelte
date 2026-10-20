@@ -21,6 +21,12 @@
 		listSnapshots,
 		restoreSnapshot,
 	} from "../lib/api";
+	import {
+		LATEST_RELEASE_URL,
+		checkForUpdates,
+		installNow,
+		updates,
+	} from "../lib/updates";
 	import type { Config, SnapshotInfo } from "../lib/types";
 
 	let draft: Config | null = null;
@@ -285,6 +291,52 @@ async function restore(s: SnapshotInfo) {
 						<option value="dark">Dark</option>
 					</select>
 				</label>
+			</div>
+		</section>
+
+		<section class="block">
+			<h3>Updates</h3>
+			<p class="muted small">
+				Vobes checks for a newer release on launch and verifies its
+				signature before installing.
+			</p>
+			<div class="row gap updater-row">
+				<span class="mono small">
+					{$updates.running ?? "—"}
+					{#if $updates.phase === "checking"}
+						· checking…
+					{:else if $updates.phase === "current"}
+						· up to date
+					{:else if $updates.phase === "available"}
+						· {$updates.offer?.version} available
+					{:else if $updates.phase === "downloading"}
+						· downloading{$updates.percent === null
+							? "…"
+							: ` ${$updates.percent}%`}
+					{:else if $updates.phase === "failed"}
+						· {$updates.message ?? "check failed"}
+					{/if}
+				</span>
+				{#if $updates.phase === "available" && $updates.offer?.kind === "updater"}
+					<button on:click={() => installNow()} disabled={saving}>
+						Install {$updates.offer.version}
+					</button>
+				{:else if $updates.phase === "available" && $updates.offer}
+					<a
+						class="button-like"
+						href={LATEST_RELEASE_URL}
+						target="_blank"
+						rel="noreferrer noopener">Release page</a
+					>
+				{:else}
+					<button
+						on:click={() => checkForUpdates()}
+						disabled={$updates.phase === "checking" ||
+							$updates.phase === "downloading"}
+					>
+						Check now
+					</button>
+				{/if}
 			</div>
 		</section>
 
@@ -556,6 +608,19 @@ async function restore(s: SnapshotInfo) {
 		font-size: 12px;
 		font-weight: 600;
 		color: var(--warn);
+	}
+	.updater-row {
+		align-items: center;
+		justify-content: space-between;
+	}
+	.button-like {
+		background: var(--bg-sunken);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		padding: 7px 12px;
+		color: var(--fg);
+		text-decoration: none;
+		font-size: 13px;
 	}
 	.danger-zone {
 		border-color: color-mix(in srgb, var(--danger) 28%, var(--border));

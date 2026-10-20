@@ -123,7 +123,7 @@ personal workspace scoped to a tag, language, or attention slice.
 ### Prerequisites
 
 - Rust stable
-- Node 22+ and pnpm 11+
+- Bun 1.4+
 - macOS: Xcode CLI tools
 - Linux: `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-app_indicator3-dev
   librsvg2-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev`
@@ -133,7 +133,7 @@ personal workspace scoped to a tag, language, or attention slice.
 
 ```bash
 cd desktop
-pnpm install
+bun install
 cargo tauri dev        # hot-reload dev loop (frontend + rust)
 cargo tauri build      # produce installable bundle (in desktop/src-tauri/target/release/bundle)
 ```
@@ -169,25 +169,29 @@ env-var approach above is the safer default.)
 
 ### Auto-update
 
-**Not yet implemented.** Auto-update is planned but not wired: there is no
-`tauri-plugin-updater` dependency, no `updater` block in
-`desktop/src-tauri/tauri.conf.json`, and no `latest.json` endpoint yet.
-Releases publish as draft GitHub releases; users must install manually.
+Wired and signed. `tauri-plugin-updater` (Rust) + `@tauri-apps/plugin-updater`
+(JS) check
+`https://github.com/JeffreyJYZ/vobes/releases/latest/download/latest.json` on
+launch, verify the minisign signature against the pubkey in
+`desktop/src-tauri/tauri.conf.json`, then download, install and relaunch.
 
-The intended path, when work begins:
+- The in-app notice appears only for versions the user has not dismissed;
+  Settings → Updates has a manual "Check now" and shows the running version.
+- If the plugin has nothing for this platform (or is absent), the check falls
+  back to the GitHub releases API so the notice can still link to the release.
+- A failed check is silent — offline or rate-limited builds are unaffected.
 
-1. Add `tauri-plugin-updater` (Rust) and `@tauri-apps/plugin-updater` (JS),
-   and a `plugins.updater` block in `tauri.conf.json` with a public key and
-   a `latest.json` endpoint.
-2. Generate a signing keypair:
-   ```bash
-   pnpm tauri signer generate -w ~/.tauri/vobes.key
-   ```
-3. Set the GitHub Actions secrets `TAURI_SIGNING_PRIVATE_KEY` (and
-   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` if a password was used); the release
-   workflow has the corresponding env lines ready to uncomment.
+Release builds must be signed with the matching private key, or the updater
+rejects them:
 
-Until this is done, the app does not check for or prompt updates.
+```bash
+gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/vobes-updater.key
+```
+
+`createUpdaterArtifacts` in `tauri.conf.json` makes the release workflow emit
+`latest.json` and the `.sig` files the updater verifies. **Do not regenerate
+the keypair** once a signed release is public: every installed copy pins the
+pubkey, and a new key makes old installs unable to verify new builds.
 
 ### Crash reporting
 
