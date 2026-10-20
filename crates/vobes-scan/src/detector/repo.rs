@@ -27,7 +27,14 @@ impl Detector for RepoDetector {
             return Ok(None);
         }
         let git = path.join(".git");
-        let is_repo = git.is_dir() || git.is_file();
+        // A `.git` directory, or a `.git` file pointing at one (worktree,
+        // submodule). A stray empty `.git` file is not a repo — tools like
+        // uv leave those inside cache dirs, and libgit2 then fails to open
+        // it.
+        let is_repo = git.is_dir()
+            || std::fs::read_to_string(&git)
+                .map(|s| s.trim_start().starts_with("gitdir:"))
+                .unwrap_or(false);
         if is_repo {
             Ok(Some(Detection {
                 is_repo: true,

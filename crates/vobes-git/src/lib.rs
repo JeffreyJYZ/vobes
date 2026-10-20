@@ -18,8 +18,11 @@ use vobes_core::{Commit, GitInfo, Result};
 pub fn read_git_info(path: &Path) -> Result<Option<GitInfo>> {
     let repo = match git2::Repository::discover(path) {
         Ok(r) => r,
-        Err(e) if e.code() == git2::ErrorCode::NotFound => return Ok(None),
-        Err(e) => return Err(vobes_core::Error::git(e.to_string())),
+        // `NotFound` means "not a repo". Every other failure — a malformed
+        // `.git`, a permission error, a corrupt object store — must not
+        // abort a scan: git state is an annotation, so degrade to "no
+        // repo" instead of failing the caller.
+        Err(_) => return Ok(None),
     };
 
     let branch = current_branch(&repo).unwrap_or_else(|| "(detached)".to_string());

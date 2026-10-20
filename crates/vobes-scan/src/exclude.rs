@@ -12,6 +12,7 @@ pub const BUILTIN_EXCLUDES: &[&str] = &[
     "dist",
     "build",
     ".cache",
+    ".uv-cache",
     "vendor",
     ".next",
     ".venv",
