@@ -1311,16 +1311,15 @@ onDestroy(() => {
 	}
 	.danger-zone h3 {
 		color: var(--danger);
-		margin-bottom: 16px;
-	}
-	.danger-zone {
-		display: grid;
-		gap: 18px;
+		margin: 0 0 10px;
 	}
 	.danger-row {
 		display: grid;
 		gap: 8px;
 		justify-items: start;
+	}
+	.danger-row + .danger-row {
+		margin-top: 18px;
 	}
 	.danger-row p {
 		margin: 0;
