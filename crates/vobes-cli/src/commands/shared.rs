@@ -1,8 +1,9 @@
 //! Shared helpers used across CLI subcommands.
 
 use std::path::{Path, PathBuf};
-use vobes_core::{normalize, Result, Vobe};
+use vobes_core::{find_by_name, normalize, Result, Vobe};
 use vobes_scan::Detection;
+use vobes_store::{Filter, Sort};
 
 use vobes_cli::app::App;
 
@@ -41,10 +42,14 @@ pub fn vobe_from_detection(path: &Path, detection: &Detection) -> Result<Vobe> {
 
 /// Resolve a name argument that could be either a vobe name or a path.
 /// Returns the vobe if found.
+///
+/// A name that matches more than one project is an error, not a coin
+/// flip: two roots can hold a project with the same basename.
 pub fn lookup_vobe(app: &App, name_or_path: &str) -> Result<Option<Vobe>> {
     // Try as name first
-    if let Some(v) = app.store.get_vobe_by_name(name_or_path)? {
-        return Ok(Some(v));
+    let all = app.store.list_vobes(&Filter::all(), Sort::Name)?;
+    if let Some(v) = find_by_name(&all, name_or_path)? {
+        return Ok(Some(v.clone()));
     }
     // Try as path
     let abs = absolute_normalized(Path::new(name_or_path));

@@ -1,8 +1,10 @@
 //! Configuration model with sensible defaults.
 
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
+use toml_edit::Document;
 
 /// Top-level config.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -79,10 +81,12 @@ impl Config {
     /// Unknown keys are ignored (serde defaults, no `deny_unknown_fields`)
     /// so a config written by an older or newer version never drops the
     /// whole file: a single stale key used to make every setting in it
-    /// silently revert to defaults. After a successful parse the file is
-    /// rewritten in canonical shape when its content differs structurally,
-    /// so stale keys don't accumulate. Comments and ordering are left
-    /// alone (the comparison is on the parsed table, not on the text).
+    /// silently revert to defaults.
+    ///
+    /// After a successful parse the file is pruned of stale keys, so they
+    /// don't accumulate. The prune edits the parsed document in place:
+    /// rewriting the file from the canonical shape deleted the user's
+    /// comments, which the old doc wrongly claimed survived.
     pub fn load_from(path: &std::path::Path) -> Result<Self, ConfigError> {
         if !path.exists() {
             return Ok(Self::default());
@@ -91,11 +95,13 @@ impl Config {
             .map_err(|e| ConfigError::Read(path.to_path_buf(), e.to_string()))?;
         let cfg: Self = Self::from_toml_str(&s)
             .map_err(|e| ConfigError::Parse(path.to_path_buf(), e.to_string()))?;
-        if let Ok(body) = cfg.to_toml_string() {
-            let current = toml::from_str::<toml::Value>(&s).ok();
-            let canonical = toml::from_str::<toml::Value>(&body).ok();
-            if current.zip(canonical).is_some_and(|(a, b)| a != b) {
-                let _ = std::fs::write(path, body);
+        if let Ok(canonical) = cfg.to_toml_string() {
+            if let (Ok(mut doc), Ok(canon)) =
+                (Document::from_str(&s), Document::from_str(&canonical))
+            {
+                if prune_unknown_keys(&mut doc, &canon) {
+                    let _ = std::fs::write(path, doc.to_string());
+                }
             }
         }
         Ok(cfg)
@@ -125,6 +131,43 @@ impl Config {
             .map(|r| expand_home(r).unwrap_or_else(|| PathBuf::from(r)))
             .collect()
     }
+}
+
+/// Remove keys and sections from `doc` that the canonical document does
+/// not have, keeping everything else — including comments and formatting.
+///
+/// Returns true when something was removed.
+fn prune_unknown_keys(doc: &mut toml_edit::Document, canon: &toml_edit::Document) -> bool {
+    let mut changed = false;
+    let stale: Vec<String> = doc
+        .as_table()
+        .iter()
+        .filter(|(k, _)| canon.as_table().get(k.as_ref()).is_none())
+        .map(|(k, _)| k.to_string())
+        .collect();
+    for k in stale {
+        doc.as_table_mut().remove(&k);
+        changed = true;
+    }
+    for (k, v) in doc.as_table_mut().iter_mut() {
+        let key = k.to_string();
+        let Some(canon_item) = canon.as_table().get(&key) else {
+            continue;
+        };
+        let (Some(table), Some(canon_table)) = (v.as_table_mut(), canon_item.as_table()) else {
+            continue;
+        };
+        let stale: Vec<String> = table
+            .iter()
+            .filter(|(k2, _)| canon_table.get(k2.as_ref()).is_none())
+            .map(|(k2, _)| k2.to_string())
+            .collect();
+        for k2 in stale {
+            table.remove(&k2);
+            changed = true;
+        }
+    }
+    changed
 }
 
 /// Expand a leading `~` to the user's home directory.

@@ -11,7 +11,7 @@ use std::io::{BufRead, BufReader, Write};
 
 use serde_json::{json, Value};
 use vobes_cli::app::App;
-use vobes_core::{normalize, ActivityEvent, Vobe};
+use vobes_core::{normalize, ActivityEvent, Query, Vobe};
 use vobes_store::{Filter, Sort};
 
 fn main() -> std::process::ExitCode {
@@ -40,7 +40,19 @@ fn main() -> std::process::ExitCode {
         }
         let request: Value = match serde_json::from_str(trimmed) {
             Ok(v) => v,
-            Err(_) => continue,
+            Err(e) => {
+                // Answer with a parse error. Dropping the line silently
+                // left the client waiting for a reply that never came.
+                let resp = json!({
+                    "jsonrpc": "2.0",
+                    "id": Value::Null,
+                    "error": { "code": -32700, "message": format!("Parse error: {e}") }
+                });
+                let s = serde_json::to_string(&resp).unwrap_or_default();
+                let _ = writeln!(out, "{s}");
+                let _ = out.flush();
+                continue;
+            }
         };
         if let Some(resp) = handle(&app, &request) {
             let s = serde_json::to_string(&resp).unwrap_or_default();
@@ -74,7 +86,7 @@ fn handle(app: &App, req: &Value) -> Option<Value> {
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": { "tools": { "listChanged": false } },
-                "serverInfo": { "name": "vobes", "version": "0.1.0" }
+                "serverInfo": { "name": "vobes", "version": env!("CARGO_PKG_VERSION") }
             }
         })),
         "ping" => Some(json!({ "jsonrpc": "2.0", "id": id, "result": {} })),
@@ -112,11 +124,11 @@ fn tools() -> Vec<Value> {
         ),
         tool(
             "vobes_search",
-            "Search Vobes by case-insensitive name substring.",
+            "Search Vobes. Accepts free text (matched against name, path and tags) and predicates: tag:<name>, name:<x>, lang:<x>, fw:<x>, pm:<x>, is:dirty, is:clean, is:behind, is:ahead, is:pinned, is:attention.",
             json!({
                 "type": "object",
                 "properties": {
-                    "query": { "type": "string", "description": "Substring to match against vobe names" }
+                    "query": { "type": "string", "description": "Free text and/or predicates, e.g. \"tag:rust is:dirty\"" }
                 },
                 "required": ["query"]
             }),
@@ -215,15 +227,17 @@ fn tool_show(app: &App, args: &Value) -> Result<String, String> {
 }
 
 fn tool_search(app: &App, args: &Value) -> Result<String, String> {
-    let query = arg_str(args, "query")?.to_lowercase();
+    let query = arg_str(args, "query")?;
+    // The shared query language, so a saved filter like `tag:rust` works
+    // here exactly as it does on the desktop.
+    let parsed = Query::parse(&query);
+    // Same filter policy as `vobes_list`: archived vobes are hidden from
+    // both, so a search never turns up a row the list would not show.
     let all = app
         .store
-        .list_vobes(&Filter::all(), Sort::Name)
+        .list_vobes(&Filter::all().exclude_archived(), Sort::Name)
         .map_err(|e| e.to_string())?;
-    let matched: Vec<&Vobe> = all
-        .iter()
-        .filter(|v| v.name.to_lowercase().contains(&query))
-        .collect();
+    let matched: Vec<&Vobe> = parsed.filter(all.iter()).into_iter().collect();
     serialize(&matched)
 }
 

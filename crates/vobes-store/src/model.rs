@@ -52,19 +52,28 @@ pub struct ExportSnapshot {
     pub vobes: Vec<Vobe>,
     /// All recorded activity events.
     pub activity: Vec<ActivityEvent>,
+    /// Saved searches, so a view pinned on one machine exists on the
+    /// next. Empty for snapshots written before this field existed.
+    #[serde(default)]
+    pub saved_filters: Vec<SavedFilter>,
 }
 
 impl ExportSnapshot {
     /// Current export format version.
-    pub const CURRENT_VERSION: u32 = 1;
+    pub const CURRENT_VERSION: u32 = 2;
 
     /// Build a snapshot from the current state.
-    pub fn new(vobes: Vec<Vobe>, activity: Vec<ActivityEvent>) -> Self {
+    pub fn new(
+        vobes: Vec<Vobe>,
+        activity: Vec<ActivityEvent>,
+        saved_filters: Vec<SavedFilter>,
+    ) -> Self {
         Self {
             version: Self::CURRENT_VERSION,
             exported_at: Utc::now(),
             vobes,
             activity,
+            saved_filters,
         }
     }
 }

@@ -51,6 +51,7 @@ Debug builds use a `-dev` suffix.
 ```bash
 vbs scan             # discover projects in configured roots
 vbs list             # show tracked vobes (status table)
+vbs list --query "tag:rust is:dirty"   # filter with the query language
 vbs show <name>      # detailed view of one vobe
 vbs log              # recent activity across all vobes
 vbs open <name>      # mark opened + launch $EDITOR
@@ -109,8 +110,9 @@ the CLI.
 
 ### Search syntax
 
-The command palette and Dashboard search accept predicates prefixed by a
-key (case-insensitive, whitespace-tolerant):
+One query language, every face — the command palette, the Dashboard
+search, `vbs list --query`, and the MCP `vobes_search` tool. Predicates
+are prefixed by a key (case-insensitive, whitespace-tolerant):
 
 - `tag:rust` — only vobes tagged `rust`
 - `lang:rust` / `fw:react` / `pm:pnpm` — language, framework, package manager
@@ -258,8 +260,9 @@ Both faces talk to the same core. Capabilities should match; gaps are bugs.
 
 | Capability | CLI (`vbs`) | Desktop | Notes |
 |---|---|---|---|
-| Scan roots, discover projects | `scan`, `sync` | `scan`, `sync` commands | identical detector pipeline |
+| Scan roots, discover projects | `scan`, `sync` | `sync` command | identical detector pipeline |
 | List vobes | `list`, `list --json` | dashboard grid | desktop adds fuzzy search + sort UI |
+| Filter vobes | `list --query "tag:rust is:dirty"` | search box | same query language on every face |
 | Show one vobe | `show <name>`, `show --json` | Projects view | desktop adds README/TODO/notes |
 | Recent activity | `log`, `log --json` | Activity view | both filter by actor |
 | Activity per vobe | `show` (embedded) | Projects activity card | — |
@@ -272,8 +275,8 @@ Both faces talk to the same core. Capabilities should match; gaps are bugs.
 | Pin vobe | — (set via store) | pin button, `set_pinned` | desktop-only surface for now |
 | Tags | — (set via store) | Projects view tag editor | desktop-only surface for now |
 | Notes | — (set via store) | Projects notes editor | desktop-only surface for now |
-| Saved filters | — | sidebar + `save_saved_filter` | desktop-only surface for now |
-| Workspaces (tag scope) | — | sidebar tag click, `tag:X` query | desktop-only surface for now |
+| Saved filters | — | sidebar + `save_saved_filter` | desktop-only surface; carried in the JSON snapshot |
+| Workspaces (tag scope) | `list --query "tag:X"` | sidebar tag click, `tag:X` query | same query language on both faces |
 | Agent attribution | `VOBES_ACTOR=agent vbs …` | inherits env | `ActivityEvent::now_env` |
 | MCP tools | `vobes-mcp` binary | — | `vobes_list/show/search/recent_activity/context` over stdio |
 | Reset + rescan | `reset --yes` | "Reset and rescan" | both call `Store::purge_all` |

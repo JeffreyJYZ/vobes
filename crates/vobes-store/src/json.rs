@@ -4,15 +4,20 @@ use std::path::Path;
 
 use vobes_core::{ActivityEvent, Result, Vobe};
 
-use crate::model::ExportSnapshot;
+use crate::model::{ExportSnapshot, SavedFilter};
 
 /// Write a JSON snapshot to disk.
-pub fn export_to_file(path: &Path, vobes: &[Vobe], activity: &[ActivityEvent]) -> Result<()> {
+pub fn export_to_file(
+    path: &Path,
+    vobes: &[Vobe],
+    activity: &[ActivityEvent],
+    saved_filters: &[SavedFilter],
+) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| vobes_core::Error::storage(format!("create dir: {e}")))?;
     }
-    let snap = ExportSnapshot::new(vobes.to_vec(), activity.to_vec());
+    let snap = ExportSnapshot::new(vobes.to_vec(), activity.to_vec(), saved_filters.to_vec());
     let s = serde_json::to_string_pretty(&snap)
         .map_err(|e| vobes_core::Error::storage(format!("encode snapshot: {e}")))?;
     std::fs::write(path, s)

@@ -281,7 +281,8 @@ impl Store for SqliteStore {
     fn export_json(&self, path: &Path) -> Result<()> {
         let vobes = self.list_vobes(&Filter::all(), Sort::Name)?;
         let activity = self.recent_activity(usize::MAX)?;
-        crate::json::export_to_file(path, &vobes, &activity)
+        let saved_filters = self.list_saved_filters()?;
+        crate::json::export_to_file(path, &vobes, &activity, &saved_filters)
     }
 
     /// Restore a snapshot. The snapshot *replaces* the current state, so
@@ -303,6 +304,25 @@ impl Store for SqliteStore {
                     .map_err(|e| vobes_core::Error::storage(format!("clear vobes: {e}")))?;
                 for v in &snap.vobes {
                     upsert_vobe_tx(conn, v)?;
+                }
+                for f in &snap.saved_filters {
+                    conn.execute(
+                        "INSERT INTO saved_filters (id, label, query, created_at)
+                         VALUES (?1, ?2, ?3, ?4)
+                         ON CONFLICT(id) DO UPDATE SET
+                            label=excluded.label,
+                            query=excluded.query,
+                            created_at=excluded.created_at",
+                        params![
+                            f.id,
+                            f.label,
+                            f.query,
+                            f.created_at.to_rfc3339(),
+                        ],
+                    )
+                    .map_err(|er| {
+                        vobes_core::Error::storage(format!("import saved filter: {er}"))
+                    })?;
                 }
                 for e in &snap.activity {
                     let kind = serde_json::to_string(&e.kind)

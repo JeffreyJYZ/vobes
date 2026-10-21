@@ -14,9 +14,10 @@
 	import VobeCard from "../components/VobeCard.svelte";
 	import { relativeTime } from "../lib/format";
 	import {
-		addSavedFilter,
 		density,
 		doSync,
+		errorString,
+		focusSearchRequest,
 		lastRefreshed,
 		pushToast,
 		scanning,
@@ -30,6 +31,9 @@
 	import type { SortKey, Vobe } from "../lib/types";
 
 	let searchEl: HTMLInputElement;
+
+	// The global "/" shortcut lands here.
+	$: if ($focusSearchRequest > 0) searchEl?.focus();
 
 	let ctxX = 0;
 	let ctxY = 0;
@@ -48,23 +52,39 @@
 		ctxY = e.detail.y;
 	}
 
+	// The context menu has no caller to catch a rejection, so the failure
+	// is toasted here — otherwise it becomes an unhandled rejection.
+	function menuAction(label: string, run: () => Promise<unknown>) {
+		return () => {
+			void run().catch((e: unknown) => {
+				pushToast({ kind: "error", message: `${label}: ${errorString(e)}` });
+			});
+		};
+	}
+
 	$: ctxItems = ctxVobe
 		? [
 				{
 					label: `Open in editor${
 						ctxDefaultEditor ? ` (${ctxDefaultEditor})` : ""
 					}`,
-					onClick: () => actions.openInEditor(ctxVobe!, ctxDefaultEditor),
+					onClick: menuAction("Editor", () =>
+						actions.openInEditor(ctxVobe!, ctxDefaultEditor),
+					),
 				},
 				{
 					label: `Open in terminal${
 						ctxDefaultTerminal ? ` (${ctxDefaultTerminal})` : ""
 					}`,
-					onClick: () => actions.openInTerminal(ctxVobe!, ctxDefaultTerminal),
+					onClick: menuAction("Terminal", () =>
+						actions.openInTerminal(ctxVobe!, ctxDefaultTerminal),
+					),
 				},
 				{
 					label: "Reveal in Finder",
-					onClick: () => actions.revealInFinder(ctxVobe!),
+					onClick: menuAction("Finder", () =>
+						actions.revealInFinder(ctxVobe!),
+					),
 				},
 				{ label: "Copy path", onClick: () => actions.copyPath(ctxVobe!) },
 				{
@@ -150,28 +170,7 @@
 				{$scanning ? "Refreshing…" : "Refresh"}
 			</button>
 			<button
-				on:click={async () => {
-					const q = $searchQuery.trim();
-					if (!q) {
-						pushToast({
-							kind: "info",
-							message: "Type a search first.",
-						});
-						return;
-					}
-					try {
-						await addSavedFilter(`View: ${q}`, q);
-						pushToast({
-							kind: "success",
-							message: `Saved view “${q}”.`,
-						});
-					} catch (_e) {
-						pushToast({
-							kind: "error",
-							message: "Could not save view.",
-						});
-					}
-				}}
+				on:click={() => actions.saveCurrentSearchAsView()}
 				disabled={!$searchQuery.trim()}
 				title="Pin this search to the sidebar"
 			>

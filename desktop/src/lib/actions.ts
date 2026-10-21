@@ -2,10 +2,12 @@ import { ask, open as openDialog } from "@tauri-apps/plugin-dialog"
 import { get } from "svelte/store"
 import * as api from "./api"
 import {
+	addSavedFilter,
 	errorString,
 	missingVobes,
 	pushToast,
 	refresh,
+	searchQuery,
 	selectedVobe,
 } from "./stores"
 import type { Vobe } from "./types"
@@ -23,33 +25,23 @@ export async function pickDir(): Promise<string | null> {
 
 /// Open the vobe's directory in the default editor. Resolves the user's
 /// stored default from localStorage via the Projects view's local
-/// handlers; this is a thin pass-through that toasts on failure.
+/// handlers; this is a thin pass-through. A failure rejects, so the
+/// caller owns the message — swallowing it here produced an error toast
+/// *and* a success toast for one failed click.
 export async function openInEditor(v: Vobe, app?: string) {
-	try {
-		await api.markOpened(v.name)
-		await api.openInEditor(v.name, app)
-	} catch (e) {
-		pushToast({ kind: "error", message: `Editor: ${errorString(e)}` })
-	}
+	await api.markOpened(v.name)
+	await api.openInEditor(v.name, app)
 }
 
 /// Spawn the default terminal at the vobe's path.
 export async function openInTerminal(v: Vobe, app?: string) {
-	try {
-		await api.markOpened(v.name)
-		await api.openInTerminal(v.name, app)
-	} catch (e) {
-		pushToast({ kind: "error", message: `Terminal: ${errorString(e)}` })
-	}
+	await api.markOpened(v.name)
+	await api.openInTerminal(v.name, app)
 }
 
 /// Reveal in the OS file manager.
 export async function revealInFinder(v: Vobe) {
-	try {
-		await api.revealInFinder(v.name)
-	} catch (e) {
-		pushToast({ kind: "error", message: errorString(e) })
-	}
+	await api.revealInFinder(v.name)
 }
 
 /// Copy the absolute path to the clipboard.
@@ -97,17 +89,20 @@ export async function removeVobe(v: Vobe) {
 /// Two confirmations: this is a recursive delete with no Trash and no
 /// undo, and the path is what's being destroyed.
 export async function deleteProjectFromDisk(v: Vobe) {
-	const ok = await ask(
-		`Delete ${v.path} from disk? Every file in that directory is removed. This cannot be undone.`,
-		{ title: "Delete project", kind: "warning" },
-	)
-	if (!ok) return
-	const sure = await ask(
-		`Last check: permanently delete ${v.name}? There is no Trash and no undo.`,
-		{ title: "Delete project", kind: "warning" },
-	)
-	if (!sure) return
+	// The dialog calls sit inside the try: a failed `ask` used to reject
+	// before any handler was attached, which reached the global
+	// unhandled-rejection handler as a red strip over the app.
 	try {
+		const ok = await ask(
+			`Delete ${v.path} from disk? Every file in that directory is removed. This cannot be undone.`,
+			{ title: "Delete project", kind: "warning" },
+		)
+		if (!ok) return
+		const sure = await ask(
+			`Last check: permanently delete ${v.name}? There is no Trash and no undo.`,
+			{ title: "Delete project", kind: "warning" },
+		)
+		if (!sure) return
 		await api.deleteProjectDir(v.name)
 		if (get(selectedVobe)?.id === v.id) selectedVobe.set(null)
 		await refresh({ silent: true })
@@ -119,12 +114,12 @@ export async function deleteProjectFromDisk(v: Vobe) {
 
 /// Delete a project's `.git` directory. Files stay, history does not.
 export async function deleteGitDir(v: Vobe) {
-	const ok = await ask(
-		`Delete ${v.path}/.git? The commit history is gone; the working files stay. This cannot be undone.`,
-		{ title: "Delete .git", kind: "warning" },
-	)
-	if (!ok) return
 	try {
+		const ok = await ask(
+			`Delete ${v.path}/.git? The commit history is gone; the working files stay. This cannot be undone.`,
+			{ title: "Delete .git", kind: "warning" },
+		)
+		if (!ok) return
 		const fresh = await api.deleteGitDir(v.name)
 		if (get(selectedVobe)?.id === v.id) selectedVobe.set(fresh)
 		await refresh({ silent: true })
@@ -143,6 +138,23 @@ export async function untrackMissing(v: Vobe) {
 		await refresh({ silent: true })
 	} catch (e) {
 		pushToast({ kind: "error", message: errorString(e) })
+	}
+}
+
+/// Pin the current search as a saved view. One implementation, used by
+/// both the Dashboard button and the command palette — the palette used
+/// to scrape the Dashboard's DOM, so it only worked on that view.
+export async function saveCurrentSearchAsView(): Promise<void> {
+	const q = get(searchQuery).trim()
+	if (!q) {
+		pushToast({ kind: "info", message: "Type a search first." })
+		return
+	}
+	try {
+		await addSavedFilter(`View: ${q}`, q)
+		pushToast({ kind: "success", message: `Saved view “${q}”.` })
+	} catch {
+		pushToast({ kind: "error", message: "Could not save view." })
 	}
 }
 

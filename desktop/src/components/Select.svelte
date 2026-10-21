@@ -4,6 +4,7 @@
 	// ignores most of the CSS we throw at the native control, and the
 	// look ends up inconsistent with the rest of the app.
 
+	import { tick } from "svelte";
 	import { clickOutside } from "../lib/clickOutside";
 
 	type Option<V extends string = string> = { value: V; label: string };
@@ -31,6 +32,9 @@
 
 	let open = false;
 	let triggerEl: HTMLButtonElement;
+	let menuEl: HTMLElement;
+	/// Index of the highlighted option, for arrow-key navigation.
+	let activeIdx = 0;
 
 	function pick(v: string) {
 		onChange(v);
@@ -53,7 +57,42 @@
 			e.preventDefault();
 			open = false;
 			triggerEl?.focus();
+			return;
 		}
+		if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+			e.preventDefault();
+			const n = options.length;
+			if (n === 0) return;
+			activeIdx =
+				e.key === "ArrowDown"
+					? (activeIdx + 1) % n
+					: (activeIdx - 1 + n) % n;
+			scrollActiveIntoView();
+			return;
+		}
+		if (e.key === "Enter" || e.key === " ") {
+			e.preventDefault();
+			const o = options[activeIdx];
+			if (o) pick(o.value);
+		}
+	}
+
+	function scrollActiveIntoView() {
+		tick().then(() => {
+			const el = menuEl?.querySelector<HTMLElement>(
+				`[data-idx="${activeIdx}"]`,
+			);
+			el?.scrollIntoView({ block: "nearest" });
+		});
+	}
+
+	// Focus the menu when it opens, so the arrow keys reach it.
+	$: if (open) {
+		activeIdx = Math.max(
+			0,
+			options.findIndex((o) => o.value === value),
+		);
+		tick().then(() => menuEl?.focus());
 	}
 
 	$: current = options.find((o) => o.value === value);
@@ -86,20 +125,25 @@
 	</button>
 	{#if open}
 		<ul
+			bind:this={menuEl}
 			class="menu"
 			class:align-right={menuAlign === "right"}
 			role="listbox"
 			aria-label={ariaLabel}
+			tabindex="-1"
 			on:keydown={onMenuKey}
 		>
-			{#each options as o (o.value)}
-				<li>
+			{#each options as o, i (o.value)}
+				<li
+					role="option"
+					aria-selected={o.value === value}
+					data-idx={i}
+				>
 					<button
 						type="button"
 						class="opt"
 						class:active={o.value === value}
-						role="option"
-						aria-selected={o.value === value}
+						class:highlighted={i === activeIdx}
 						on:click={() => pick(o.value)}
 					>
 						{o.label}
@@ -227,6 +271,9 @@
 		text-align: left;
 	}
 	.opt:hover {
+		background: var(--bg-sunken);
+	}
+	.opt.highlighted {
 		background: var(--bg-sunken);
 	}
 	.opt.active {

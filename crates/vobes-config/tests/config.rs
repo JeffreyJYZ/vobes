@@ -197,6 +197,37 @@ launch_on_login = false
 }
 
 #[test]
+fn load_preserves_user_comments() {
+    // The prune edits the document in place. Rewriting the file from the
+    // canonical shape used to delete every comment, while the doc claimed
+    // they survived.
+    let dir = std::env::temp_dir().join("vobes-config-comment-tests");
+    std::fs::create_dir_all(&dir).unwrap();
+    let p = dir.join("config.toml");
+    let src = r#"
+# my scan roots
+[scan]
+roots = ["~/dev"]   # where the code lives
+max_depth = 4
+
+# stale section, should be pruned
+[git]
+cache_ttl_seconds = 60
+"#;
+    std::fs::write(&p, src).unwrap();
+    Config::load_from(&p).unwrap();
+    let after = std::fs::read_to_string(&p).unwrap();
+    assert!(after.contains("# my scan roots"), "comment lost:\n{after}");
+    assert!(
+        after.contains("# where the code lives"),
+        "trailing comment lost:\n{after}"
+    );
+    assert!(!after.contains("[git]"), "stale section survived:\n{after}");
+    std::fs::remove_file(&p).ok();
+    std::fs::remove_dir(&dir).ok();
+}
+
+#[test]
 fn shipped_example_toml_parses() {
     // The vobes.example.toml at the repo root must always parse
     // against the current schema — catches stale fields after a

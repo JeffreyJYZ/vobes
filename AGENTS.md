@@ -10,8 +10,13 @@
   `~/Library/Application Support/vobes/config.toml`. Debug builds suffix `-dev`.
   Override with `VOBES_APP_DIR`.
 - **Workspace query language.** `tag:X`, `lang:X`, `fw:X`, `pm:X`, `is:<flag>`,
-  `name:X`. Predicate parsing in `desktop/src/lib/stores.ts` (`parseQuery`). Keep
-  CLI + desktop search semantically aligned.
+  `name:X`. The parser lives in `crates/vobes-core/src/query.rs` (`Query::parse`) —
+  the Rust side is the source of truth, and `desktop/src/lib/stores.ts` mirrors it.
+  Every face uses it: CLI `vbs list --query`, MCP `vobes_search`, desktop search.
+  Change one, change the other.
+- **Config file is user-owned.** `config.toml` keeps the user's comments; the
+  loader prunes stale keys with `toml_edit` rather than rewriting the file.
+  Never rewrite it from the canonical shape.
 - **Plugin surface.** `crates/vobes-core/src/plugins.rs` defines trait; new
   capabilities extend core, not desktop.
 

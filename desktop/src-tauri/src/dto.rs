@@ -47,6 +47,9 @@ pub struct CommitDto {
 pub struct ActivityDto {
     pub id: Option<u64>,
     pub vobe_id: String,
+    /// PascalCase, matching the CLI and MCP wire format. The desktop
+    /// used to send the lowercase label, so the same event had two
+    /// spellings depending on which face produced it.
     pub kind: String,
     pub timestamp: String,
     pub detail: Option<String>,
@@ -91,7 +94,7 @@ impl From<&vobes_core::ActivityEvent> for ActivityDto {
         Self {
             id: e.id,
             vobe_id: e.vobe_id.as_str().to_string(),
-            kind: e.kind.label().to_string(),
+            kind: format!("{:?}", e.kind),
             timestamp: e.timestamp.to_rfc3339(),
             detail: e.detail.clone(),
             actor: e.actor.clone(),
@@ -133,24 +136,23 @@ mod tests {
                 "ActivityDto missing snake_case field {k}: {a_json}"
             );
         }
-        // kind is the lowercase human label, not the PascalCase variant.
-        assert!(a_json.contains("\"opened\""), "got {a_json}");
+        // kind is the PascalCase variant, matching the CLI and MCP
+        // wire format. The frontend lowercases it for display.
+        assert!(a_json.contains("\"Opened\""), "got {a_json}");
     }
 
     #[test]
-    fn activity_kind_label_is_human_readable() {
-        // The frontend renders e.kind directly. If the DTO started
-        // sending debug-formatted variants, the activity feed would
-        // show "Opened" instead of "opened".
-        for (kind, label) in [
-            (ActivityKind::Opened, "opened"),
-            (ActivityKind::Scanned, "scanned"),
-            (ActivityKind::Created, "created"),
-            (ActivityKind::Tagged, "tagged"),
+    fn activity_kind_matches_the_core_wire_format() {
+        // One spelling for the same event on every face.
+        for (kind, wire) in [
+            (ActivityKind::Opened, "Opened"),
+            (ActivityKind::Scanned, "Scanned"),
+            (ActivityKind::Created, "Created"),
+            (ActivityKind::Tagged, "Tagged"),
         ] {
             let ev = ActivityEvent::now(VobeId::from_string("x"), kind);
             let dto = ActivityDto::from(&ev);
-            assert_eq!(dto.kind, label);
+            assert_eq!(dto.kind, wire);
         }
     }
 }

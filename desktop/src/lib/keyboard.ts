@@ -19,6 +19,12 @@ export type ShortcutCombo =
 	| {
 			kind: "key"
 			key: string
+			/**
+			 * Physical key to match when `key` is layout-dependent. A
+			 * shifted `/` reports `e.key === "?"` on a US layout, so the
+			 * character alone can never identify it — `e.code` can.
+			 */
+			code?: string
 			mod?: boolean
 			shift?: boolean
 			alt?: boolean
@@ -35,6 +41,7 @@ const META = isMac()
 
 function comboToEvent(combo: ShortcutCombo): {
 	key: string
+	code?: string
 	mod: boolean
 	shift: boolean
 	alt: boolean
@@ -42,6 +49,7 @@ function comboToEvent(combo: ShortcutCombo): {
 	if (combo.kind === "key") {
 		return {
 			key: combo.key.toLowerCase(),
+			code: combo.code,
 			mod: !!combo.mod,
 			shift: !!combo.shift,
 			alt: !!combo.alt,
@@ -61,6 +69,9 @@ export function matchShortcut(combo: ShortcutCombo, e: KeyboardEvent): boolean {
 	if (haveMod !== want.mod) return false
 	if (e.shiftKey !== want.shift) return false
 	if (e.altKey !== want.alt) return false
+	// A physical code wins over the character: `?` is a shifted `/` on a
+	// US layout, so the character alone never matches the unshifted key.
+	if (want.code) return e.code === want.code
 	return e.key.toLowerCase() === want.key
 }
 
@@ -100,9 +111,14 @@ export const shortcuts: Shortcut[] = [
 	defineShortcut("help", "Show keyboard shortcuts", {
 		kind: "key",
 		key: "/",
+		code: "Slash",
 		shift: true,
 	}),
-	defineShortcut("search", "Focus search", { kind: "key", key: "/" }),
+	defineShortcut("search", "Focus search", {
+		kind: "key",
+		key: "/",
+		code: "Slash",
+	}),
 	defineShortcut("dashboard", "Go to dashboard", { kind: "key", key: "1" }),
 	defineShortcut("projects", "Go to projects", { kind: "key", key: "2" }),
 	defineShortcut("activity", "Go to activity", { kind: "key", key: "3" }),

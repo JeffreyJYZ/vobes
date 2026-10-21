@@ -4,6 +4,8 @@
 import { relativeTime } from "../lib/format";
 	import {
 		activity,
+		errorString,
+		pushToast,
 		refresh,
 		scanning,
 		vobes,
@@ -16,20 +18,25 @@ import { relativeTime } from "../lib/format";
 
 	// Re-fetch from the backend whenever the actor filter changes so
 	// the "agent vs human" view is exact, not a client-side subset of
-	// the default 50-event page already loaded.
+	// the default 50-event page already loaded. The result is view-local:
+	// writing it into the global `activity` store corrupted the sidebar's
+	// event count and narrowed the Kind/Actor option lists.
+	let actorEvents: ActivityEvent[] | null = null;
+
 	async function applyActorFilter(actor: string) {
 		actorFilter = actor;
 		const a = actor === "all" ? undefined : actor;
 		try {
-			const events = await recentActivity(200, a);
-			activity.set(events);
-		} catch {
+			actorEvents = await recentActivity(200, a);
+		} catch (e) {
 			// keep existing events — backend may be busy
+			pushToast({ kind: "error", message: errorString(e) });
 		}
 	}
 
+	$: source = actorFilter === "all" ? $activity : (actorEvents ?? []);
 	$: filtered = filterEvents(
-		$activity,
+		source,
 		$vobes,
 		kindFilter,
 		vobeFilter,
@@ -77,6 +84,8 @@ import { relativeTime } from "../lib/format";
 		return all.find((v) => v.id === id)?.name ?? id.slice(0, 8);
 	}
 
+	// The option lists come from the unfiltered store, so picking an actor
+	// does not remove the other actors from the dropdown.
 	$: kinds = Array.from(new Set($activity.map((e) => e.kind))).sort();
 	$: actors = Array.from(new Set($activity.map((e) => e.actor))).sort();
 </script>
@@ -120,7 +129,7 @@ import { relativeTime } from "../lib/format";
 				{/each}
 			</select>
 		</label>
-		<span class="count">{$activity.length} events</span>
+		<span class="count">{source.length} events</span>
 	</div>
 
 	{#if filtered.length === 0}
@@ -141,7 +150,7 @@ import { relativeTime } from "../lib/format";
 							<span class="when">{relativeTime(e.timestamp)}</span
 							>
 							<span class="what">
-								<span class="verb">{e.kind}</span>
+								<span class="verb">{e.kind.toLowerCase()}</span>
 								<span class="vobe"
 									>{vobeName(e.vobe_id, $vobes)}</span
 								>

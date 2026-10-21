@@ -1,32 +1,12 @@
 <script lang="ts">
 	import { relativeTime } from "../lib/format";
-	import { selectedVobe, view, vobes } from "../lib/stores";
+	import { attentionItems, selectedVobe, view, vobes } from "../lib/stores";
 	import type { Vobe } from "../lib/types";
 
-	type Item = { vobe: Vobe; reason: string; weight: number };
-
-	$: items = attentionItems($vobes);
-
-	function attentionItems(all: Vobe[]): Item[] {
-		const out: Item[] = [];
-		for (const v of all) {
-			const g = v.git;
-			if (!g) continue;
-			if (g.dirty) {
-				out.push({ vobe: v, reason: "uncommitted changes", weight: 3 });
-				continue;
-			}
-			if (g.ahead > 0) {
-				out.push({ vobe: v, reason: `${g.ahead} to push`, weight: 2 });
-				continue;
-			}
-			if (g.behind > 0) {
-				out.push({ vobe: v, reason: `${g.behind} behind`, weight: 1 });
-			}
-		}
-		out.sort((a, b) => b.weight - a.weight);
-		return out.slice(0, 6);
-	}
+	// The panel shows the first six; the sidebar count uses the same
+	// rule over the full list.
+	$: all = attentionItems($vobes);
+	$: items = all.slice(0, 6);
 
 	function open(v: Vobe) {
 		selectedVobe.set(v);
@@ -38,7 +18,7 @@
 	<section class="attention">
 		<header>
 			<h3>Needs attention</h3>
-			<span class="count">{items.length}</span>
+			<span class="count">{all.length}</span>
 		</header>
 		<ul>
 			{#each items as it (it.vobe.id)}

@@ -171,7 +171,7 @@
 					<button
 						class="saved-x"
 						type="button"
-						on:click={() => removeSavedFilter(f.id).catch(() => {})}
+						on:click={() => removeSavedFilter(f.id)}
 						aria-label="Remove saved view"
 						title="Remove">×</button
 					>

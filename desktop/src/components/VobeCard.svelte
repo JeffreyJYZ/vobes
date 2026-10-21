@@ -28,13 +28,15 @@
 	const dispatch = createEventDispatcher();
 </script>
 
+<!-- The card is wrapped in a real <button> by the caller, so it must
+     not be a button itself. `group` gives the context-menu handler a
+     role without claiming an interactive element. -->
 <div
 	class="card"
 	class:compact
 	class:attention={needsAttention}
 	class:pinned
-	role="button"
-	tabindex="0"
+	role="group"
 	on:contextmenu={onContext}
 >
 	<div class="row1">

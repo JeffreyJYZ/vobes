@@ -2,6 +2,7 @@
 	import { invoke } from "@tauri-apps/api/core";
 	import { open as openDialog } from "@tauri-apps/plugin-dialog";
 	import { onMount, tick } from "svelte";
+	import * as actions from "../lib/actions";
 	import { frameworkLabel, languageLabel, modKeyLabel } from "../lib/format";
 	import { fuzzy } from "../lib/fuzzy";
 	import { matchShortcut } from "../lib/keyboard";
@@ -87,33 +88,7 @@
 		{
 			id: "action.save_view",
 			label: "Save current search as a view",
-			run: () => {
-				const q =
-					(
-						document.querySelector(
-							".search input",
-						) as HTMLInputElement | null
-					)?.value ?? "";
-				if (!q.trim()) {
-					pushToast({
-						kind: "info",
-						message: "Type a search first.",
-					});
-					return;
-				}
-				addSavedFilter(`View: ${q}`, q).then(
-					() =>
-						pushToast({
-							kind: "success",
-							message: `Saved view “${q}”.`,
-						}),
-					() =>
-						pushToast({
-							kind: "error",
-							message: "Could not save view.",
-						}),
-				);
-			},
+			run: () => actions.saveCurrentSearchAsView(),
 		},
 		{
 			id: "action.clear_search",
@@ -187,9 +162,19 @@
 
 	$: if (isOpen) reset();
 
+	// Typing narrows `items`, so the old index can point past the end:
+	// no row is highlighted and Enter does nothing. Start at the top on
+	// every new query.
+	let lastQuery = "";
+	$: if (query !== lastQuery) {
+		lastQuery = query;
+		active = 0;
+	}
+
 	function reset() {
 		query = "";
 		active = 0;
+		lastQuery = "";
 		tick().then(() => inputEl?.focus());
 	}
 
@@ -225,7 +210,8 @@
 		}
 		if (e.key === "ArrowDown" || (e.key === "n" && e.ctrlKey)) {
 			e.preventDefault();
-			active = Math.min(items.length - 1, active + 1);
+			// An empty list would otherwise push the index to -1.
+			active = Math.max(0, Math.min(items.length - 1, active + 1));
 			scrollIntoView();
 			return;
 		}

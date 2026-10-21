@@ -1,7 +1,11 @@
 <script lang="ts">
-	import { isMac } from "../lib/format";
+	
+	import { tick } from "svelte";
+import { isMac } from "../lib/format";
 	import { shortcuts } from "../lib/keyboard";
 	import { helpOpen } from "../lib/stores";
+
+	let closeBtn: HTMLButtonElement;
 
 	function close() {
 		helpOpen.set(false);
@@ -9,19 +13,33 @@
 	function backdrop(e: MouseEvent) {
 		if (e.target === e.currentTarget) close();
 	}
+	// The overlay owns its own Escape, like the command palette does.
+	function onKey(e: KeyboardEvent) {
+		if (e.key === "Escape") {
+			e.preventDefault();
+			close();
+		}
+	}
+	// Focus has to be inside the dialog for the key handler to fire.
+	$: if ($helpOpen) {
+		void tick().then(() => closeBtn?.focus());
+	}
 </script>
 
 {#if $helpOpen}
 	<div class="backdrop" role="presentation" on:click={backdrop}>
+		<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 		<div
 			class="modal"
 			role="dialog"
 			aria-modal="true"
 			aria-label="Keyboard shortcuts"
+			on:keydown={onKey}
 		>
 			<div class="head">
 				<h3>Keyboard shortcuts</h3>
 				<button
+					bind:this={closeBtn}
 					class="close"
 					type="button"
 					on:click={close}

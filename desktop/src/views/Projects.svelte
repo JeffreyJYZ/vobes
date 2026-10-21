@@ -73,7 +73,15 @@ $: editorLabel =
 
 $: selected = $selectedVobe;
 
-$: if (selected) {
+// Keyed on the vobe *id*, not the object: pinning, tagging or renaming
+// writes a new object into the store, and resetting on that wiped the
+// loaded README, the scanned TODOs and any unsaved note edits.
+let loadedVobeId: string | null = null;
+
+$: if (!selected) {
+	loadedVobeId = null;
+} else if (selected.id !== loadedVobeId) {
+	loadedVobeId = selected.id;
 	notesDraft = selected.notes ?? "";
 	readmeText = null;
 	readmeLoaded = false;
@@ -743,7 +751,7 @@ onDestroy(() => {
 								<span class="when"
 									>{relativeTime(e.timestamp)}</span
 								>
-								<span class="what">{e.kind.toLowerCase()}</span>
+								<span class="what">{e.kind}</span>
 								{#if e.detail}<span class="detail"
 										>— {e.detail}</span
 									>{/if}

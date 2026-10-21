@@ -35,9 +35,18 @@ export const lastRefreshed = writable<number>(0)
 export const scanning = writable<boolean>(false)
 export const missingVobes = writable<Vobe[]>([])
 
+/// Set while a refresh is in flight. Separate from `scanning`: a scan sets
+/// `scanning` and then asks for a refresh, so sharing one flag made the
+/// post-scan refresh bail out and leave the dashboard on stale rows.
+let refreshInFlight = false
+
 export async function refresh(opts: { silent?: boolean } = {}): Promise<void> {
-	if (get(scanning)) return
-	if (!opts.silent) scanning.set(true)
+	if (refreshInFlight) return
+	refreshInFlight = true
+	// Only clear the spinner if this call raised it — a silent refresh
+	// must not switch off a scan's spinner.
+	const raised = !opts.silent
+	if (raised) scanning.set(true)
 	try {
 		const [vs, acts, gone] = await Promise.all([
 			api.listVobes(),
@@ -67,7 +76,8 @@ export async function refresh(opts: { silent?: boolean } = {}): Promise<void> {
 	} catch (e) {
 		pushToast({ kind: "error", message: errorString(e) })
 	} finally {
-		scanning.set(false)
+		refreshInFlight = false
+		if (raised) scanning.set(false)
 	}
 }
 
@@ -109,6 +119,9 @@ export async function doSync(): Promise<void> {
 			kind: "success",
 			message: `Sync: +${added} new, ${updated} refreshed.`,
 		})
+		// The scan is done, so drop the spinner before the refresh — the
+		// refresh owns its own in-flight guard.
+		scanning.set(false)
 		await refresh({ silent: true })
 		lastRefreshed.set(Date.now())
 	} catch (e) {
@@ -141,9 +154,16 @@ export const view: Writable<ViewId> = {
 			void ask("You have unsaved settings. Leave without saving?", {
 				title: "Vobes",
 				kind: "warning",
-			}).then((ok) => {
-				if (ok) viewStore.set(next)
-			})
+			}).then(
+				(ok) => {
+					if (ok) viewStore.set(next)
+				},
+				// A failing dialog used to reject with no handler, which
+				// reached the global unhandled-rejection handler.
+				(e: unknown) => {
+					pushToast({ kind: "error", message: errorString(e) })
+				},
+			)
 			return
 		}
 		viewStore.set(next)
@@ -157,6 +177,14 @@ export const selectedVobe = writable<Vobe | null>(null)
 export const searchQuery = writable<string>("")
 export const sortKey = writable<SortKey>("last_modified")
 export const density = writable<"comfy" | "compact">("comfy")
+
+/// Bumped when the global shortcut asks the Dashboard to focus its search
+/// box. A counter, not a boolean, so two presses in a row both land.
+export const focusSearchRequest = writable<number>(0)
+
+export function focusSearch(): void {
+	focusSearchRequest.update((n) => n + 1)
+}
 
 // ---- Command palette ----
 
@@ -250,7 +278,20 @@ export function pushToast(input: {
 		ttl,
 		action: input.action,
 	}
-	toasts.update((arr) => [...arr, t].slice(-3))
+	toasts.update((arr) => {
+		const next = [...arr, t]
+		// The list is capped, but an undismissed error is not evicted:
+		// it persists until dismissed, and dropping it silently meant the
+		// user never saw the failure.
+		if (next.length <= 3) return next
+		const evicted = next.slice(0, next.length - 3)
+		const kept = next.slice(next.length - 3).filter((x) => x.ttl > 0)
+		for (const e of evicted) {
+			if (e.ttl > 0) continue
+			kept.unshift(e)
+		}
+		return kept
+	})
 	if (t.ttl > 0) {
 		setTimeout(() => dismissToast(id), t.ttl)
 	}
@@ -263,17 +304,40 @@ export function dismissToast(id: number) {
 
 // ---- Derived helpers ----
 
-export const attentionCount: Readable<number> = derived(vobes, ($v) => {
-	let n = 0
-	for (const v of $v) {
-		if (v.git) {
-			if (v.git.dirty) n++
-			else if (v.git.ahead > 0) n++
-			else if (v.git.behind > 0) n++
+/// Every vobe that needs attention, most urgent first. The panel shows the
+/// first six of these, so both the list and the sidebar count come from
+/// one rule instead of two that disagreed.
+export type AttentionItem = {
+	vobe: Vobe
+	reason: string
+	weight: number
+}
+
+export function attentionItems(all: Vobe[]): AttentionItem[] {
+	const out: AttentionItem[] = []
+	for (const v of all) {
+		const g = v.git
+		if (!g) continue
+		if (g.dirty) {
+			out.push({ vobe: v, reason: "uncommitted changes", weight: 3 })
+			continue
+		}
+		if (g.ahead > 0) {
+			out.push({ vobe: v, reason: `${g.ahead} to push`, weight: 2 })
+			continue
+		}
+		if (g.behind > 0) {
+			out.push({ vobe: v, reason: `${g.behind} behind`, weight: 1 })
 		}
 	}
-	return n
-})
+	out.sort((a, b) => b.weight - a.weight)
+	return out
+}
+
+export const attentionCount: Readable<number> = derived(
+	vobes,
+	($v) => attentionItems($v).length,
+)
 
 export const visibleVobes: Readable<Vobe[]> = derived(
 	[vobes, missingVobes, searchQuery, sortKey],
@@ -467,6 +531,9 @@ export const effectiveTheme = writable<EffectiveTheme>(
 if (typeof window !== "undefined" && window.matchMedia) {
 	const mq = window.matchMedia("(prefers-color-scheme: dark)")
 	const listener = (e: MediaQueryListEvent) => {
+		// Only "auto" follows the OS. An explicit light/dark preference
+		// was being overwritten the moment the OS theme changed.
+		if (get(themePref) !== "auto") return
 		effectiveTheme.set(e.matches ? "dark" : "light")
 	}
 	if (mq.addEventListener) mq.addEventListener("change", listener)
@@ -544,8 +611,10 @@ export async function loadSavedFilters(): Promise<void> {
 		savedFiltersLoaded.set(true)
 	} catch (e) {
 		// Backend unavailable (e.g. dev-mode race) — leave the store
-		// empty; refresh will retry.
+		// empty and say so. `refresh()` never retries this, so the list
+		// would stay empty for the whole session with no explanation.
 		console.warn("loadSavedFilters failed:", e)
+		pushToast({ kind: "error", message: errorString(e) })
 	}
 }
 
@@ -568,7 +637,10 @@ export async function removeSavedFilter(id: string): Promise<void> {
 	try {
 		await api.removeSavedFilter(id)
 	} catch (e) {
-		console.warn("removeSavedFilter backend call failed:", e)
+		// The row is still in SQLite, so dropping it here made the view
+		// reappear on the next launch. Keep it and say why.
+		pushToast({ kind: "error", message: errorString(e) })
+		return
 	}
 	savedFilters.update((arr) => arr.filter((f) => f.id !== id))
 }

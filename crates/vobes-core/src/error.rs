@@ -11,14 +11,22 @@ use std::str::FromStr;
 pub struct VobeId(pub String);
 
 impl VobeId {
-    /// Generate a fresh id from the current monotonic-ish timestamp.
+    /// Generate a fresh id from the current timestamp plus a counter.
+    ///
+    /// The counter matters: the system clock is not fine-grained
+    /// everywhere (Windows resolves it to ~100ns), so two vobes created
+    /// in the same tick got the same id — and `ON CONFLICT(id) DO UPDATE`
+    /// then silently overwrote one of them.
     pub fn new() -> Self {
+        use std::sync::atomic::{AtomicU64, Ordering};
         use std::time::{SystemTime, UNIX_EPOCH};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        Self(format!("vobe_{nanos:x}"))
+        let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
+        Self(format!("vobe_{nanos:x}_{seq:x}"))
     }
 
     /// Wrap an existing id string.

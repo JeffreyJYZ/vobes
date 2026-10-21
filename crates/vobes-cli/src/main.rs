@@ -31,6 +31,11 @@ pub enum Command {
     Scan,
     /// List all tracked vobes.
     List {
+        /// Filter with the shared query language: free text plus predicates
+        /// like `tag:rust`, `lang:rust`, `fw:react`, `pm:pnpm`, `is:dirty`,
+        /// `is:behind`, `is:pinned`, `is:attention`, `name:foo`.
+        #[clap(long)]
+        query: Option<String>,
         /// Emit raw JSON instead of a table (for AI agents / scripting).
         #[clap(long)]
         json: bool,
@@ -130,7 +135,7 @@ fn main() -> std::process::ExitCode {
 fn dispatch(app: &vobes_cli::app::App, cmd: Command) -> vobes_core::Result<()> {
     match cmd {
         Command::Scan => commands::scan::run(app),
-        Command::List { json } => commands::list::run(app, json),
+        Command::List { query, json } => commands::list::run(app, json, query.as_deref()),
         Command::Show { name, json } => commands::show::run(app, &name, json),
         Command::Log { limit, json } => commands::log::run(app, limit, json),
         Command::Context { name } => commands::context::run(app, &name),

@@ -12,14 +12,14 @@ use vobes_core::{Commit, GitInfo, Vobe, VobeId};
 fn vobe_id_new_nonempty_and_unique() {
     let a = VobeId::new();
     let b = VobeId::new();
-    // Uniqueness relies on nanosecond monotonicity — sleep a tiny bit.
-    std::thread::sleep(std::time::Duration::from_nanos(100));
     let c = VobeId::new();
     assert!(a.as_str().starts_with("vobe_"));
     assert!(!a.as_str().is_empty());
-    // `a` and `c` should differ because time advanced.
+    // Back-to-back ids must differ: the clock is not fine-grained
+    // everywhere, so a counter is part of the id.
+    assert_ne!(a, b);
+    assert_ne!(b, c);
     assert_ne!(a, c);
-    let _ = b; // silence unused warning
 }
 
 #[test]

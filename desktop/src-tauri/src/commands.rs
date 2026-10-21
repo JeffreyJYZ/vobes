@@ -849,9 +849,9 @@ pub async fn open_in_editor(
 /// Shared helpers reused from CLI logic. Kept private to this module.
 pub mod shared {
     use std::path::{Path, PathBuf};
-    use vobes_core::{normalize, Result, Vobe};
+    use vobes_core::{find_by_name, normalize, Result, Vobe};
     use vobes_scan::Detection;
-    use vobes_store::Store;
+    use vobes_store::{Filter, Sort, Store};
 
     /// Make a path absolute against the current working directory, then
     /// normalize separators/dots. Stable across platforms and input styles.
@@ -887,9 +887,13 @@ pub mod shared {
     }
 
     /// Resolve a name argument that could be either a vobe name or a path.
+    ///
+    /// A name that matches more than one project is an error, not a coin
+    /// flip: two roots can hold a project with the same basename.
     pub fn lookup_vobe(store: &dyn Store, name_or_path: &str) -> Result<Option<Vobe>> {
-        if let Some(v) = store.get_vobe_by_name(name_or_path)? {
-            return Ok(Some(v));
+        let all = store.list_vobes(&Filter::all(), Sort::Name)?;
+        if let Some(v) = find_by_name(&all, name_or_path)? {
+            return Ok(Some(v.clone()));
         }
         let p = std::path::PathBuf::from(name_or_path);
         let abs = if p.is_absolute() {

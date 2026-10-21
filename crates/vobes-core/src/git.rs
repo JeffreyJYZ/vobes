@@ -69,16 +69,28 @@ pub struct Commit {
 impl Commit {
     /// Abbreviated SHA — first 7 chars.
     pub fn short_hash(&self) -> &str {
-        let len = self.hash.len().min(7);
+        // A SHA is ASCII hex, so the byte slice is safe here — but clamp
+        // on a char boundary anyway so a malformed hash cannot panic.
+        let len = self
+            .hash
+            .char_indices()
+            .nth(7)
+            .map(|(i, _)| i)
+            .unwrap_or(self.hash.len());
         &self.hash[..len]
     }
 
     /// First line of the message, truncated to `max` chars.
+    ///
+    /// Truncates on a char boundary: slicing the raw bytes panicked on a
+    /// multi-byte character, so `vbs show` crashed on a commit message
+    /// with any non-ASCII text.
     pub fn short_message(&self, max: usize) -> String {
-        if self.message.len() <= max {
+        if self.message.chars().count() <= max {
             self.message.clone()
         } else {
-            format!("{}…", &self.message[..max])
+            let head: String = self.message.chars().take(max).collect();
+            format!("{head}…")
         }
     }
 }

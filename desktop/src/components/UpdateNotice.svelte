@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from "svelte";
+	import { openUrlExternal } from "../lib/api";
 	import {
 		dismissedVersion,
 		dismissOffer,
@@ -25,9 +26,13 @@
 	<div class="strip">
 		<p>
 			Version
-			<a href={LATEST_RELEASE_URL} target="_blank" rel="noreferrer noopener"
-				>{offer.version}</a
+			<button
+				class="linkish"
+				type="button"
+				on:click={() => openUrlExternal(LATEST_RELEASE_URL)}
 			>
+				{offer.version}
+			</button>
 			is available.
 			{#if $updates.phase === "downloading"}
 				<span class="muted">
@@ -52,9 +57,13 @@
 				{$updates.phase === "downloading" ? "Updating…" : "Update now"}
 			</button>
 		{:else}
-			<a class="action" href={LATEST_RELEASE_URL} target="_blank" rel="noreferrer noopener">
+			<button
+				class="action"
+				type="button"
+				on:click={() => openUrlExternal(LATEST_RELEASE_URL)}
+			>
 				Release page
-			</a>
+			</button>
 		{/if}
 		{#if $updates.phase !== "downloading"}
 			<button
@@ -84,8 +93,14 @@
 		flex: 1;
 		min-width: 0;
 	}
-	.strip a {
+	.linkish {
+		background: transparent;
+		border: none;
+		padding: 0;
+		font: inherit;
 		color: var(--accent);
+		cursor: pointer;
+		text-decoration: underline;
 	}
 	.muted {
 		color: var(--fg-faint);

@@ -17,6 +17,7 @@
 		config,
 		doSync,
 		effectiveTheme,
+		focusSearch,
 		helpOpen,
 		loadConfig,
 		loadSavedFilters,
@@ -24,6 +25,7 @@
 		openPalette,
 		pushToast,
 		refresh,
+		searchQuery,
 		selectedVobe,
 		themePref,
 		view,
@@ -37,6 +39,7 @@
 	let autoRefreshTimer: number | undefined;
 	let fsDebounce: number | undefined;
 	const unlistens: Array<() => void> = [];
+	const focusOffs: Array<() => void> = [];
 
 	// The floating "⌘K Search" hint. Shown until the user either opens
 	// the palette once, or dismisses it explicitly. Stops competing with
@@ -85,13 +88,15 @@
 		// Auto-refresh on window focus. We deliberately throttle to once per
 		// 15s so a fast tab-switch doesn't hammer the disk.
 		let lastFocusRefresh = 0;
-		window.addEventListener("focus", () => {
+		const onFocus = () => {
 			const now = Date.now();
 			if (now - lastFocusRefresh > 15000) {
 				lastFocusRefresh = now;
 				refresh({ silent: true });
 			}
-		});
+		};
+		window.addEventListener("focus", onFocus);
+		focusOffs.push(() => window.removeEventListener("focus", onFocus));
 
 		// Background interval: if the user leaves Vobes open, keep git state
 		// fresh. Disabled in the help / palette overlays so the UI stays calm.
@@ -130,6 +135,7 @@
 		if (autoRefreshTimer) clearInterval(autoRefreshTimer);
 		if (fsDebounce) clearTimeout(fsDebounce);
 		for (const u of unlistens) u();
+		for (const off of focusOffs) off();
 	});
 
 	function handleDeepLink(url: string) {
@@ -137,7 +143,7 @@
 		//   vobes://open/<name>     — focus vobe by name
 		//   vobes://open?id=<id>    — focus vobe by stable id (preferred)
 		//   vobes://add?path=<p>    — add vobe at path, then focus
-		//   vobes://search?q=<q>    — save + focus a search query
+		//   vobes://search?q=<q>    — run a search query
 		try {
 			const u = new URL(url);
 			if (u.hostname === "open" || u.pathname.startsWith("/open")) {
@@ -192,10 +198,11 @@
 					});
 			} else if (u.hostname === "search") {
 				const q = u.searchParams.get("q") ?? "";
+				// Actually search: the deep link used to save a view and
+				// never set the query, so the link opened an unfiltered
+				// dashboard and added a row to the sidebar every time.
 				view.set("dashboard");
-				addSavedFilter(`Search: ${q}`, q).catch(() => {
-					pushToast({ kind: "error", message: `Could not save search “${q}”.` });
-				});
+				searchQuery.set(q);
 			} else {
 				pushToast({ kind: "info", message: `Opened ${url}` });
 			}
@@ -219,6 +226,13 @@
 		) {
 			e.preventDefault();
 			view.set("dashboard");
+			return;
+		}
+		if (matchShortcut(shortcuts.find((s) => s.id === "search")!.combo, e)) {
+			e.preventDefault();
+			// The search box lives on the Dashboard, so go there first.
+			view.set("dashboard");
+			focusSearch();
 			return;
 		}
 		if (
@@ -290,24 +304,27 @@
 <Toast />
 
 {#if showPaletteHint}
-	<button
-		class="palette-hint"
-		type="button"
-		on:click={() => {
-			openPalette();
-			dismissPaletteHint();
-		}}
-		title="Command palette"
-	>
-		<span class="kbd">{modKeyLabel()} K</span>
-		<span class="lbl">Search</span>
+	<!-- Two sibling buttons: a button inside a button is invalid HTML. -->
+	<div class="palette-hint">
+		<button
+			class="hint-open"
+			type="button"
+			on:click={() => {
+				openPalette();
+				dismissPaletteHint();
+			}}
+			title="Command palette"
+		>
+			<span class="kbd">{modKeyLabel()} K</span>
+			<span class="lbl">Search</span>
+		</button>
 		<button
 			class="dismiss"
 			type="button"
 			aria-label="Dismiss hint"
-			on:click|stopPropagation={dismissPaletteHint}>×</button
+			on:click={dismissPaletteHint}>×</button
 		>
-	</button>
+	</div>
 {/if}
 
 <style>
@@ -355,9 +372,19 @@
 		border-radius: 999px;
 		color: var(--fg-muted);
 		font-size: 12px;
-		cursor: pointer;
 		box-shadow: var(--shadow-sm);
 		z-index: 40;
+	}
+	.palette-hint .hint-open {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		background: transparent;
+		border: none;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+		padding: 0;
 	}
 	.palette-hint:hover {
 		color: var(--fg);

@@ -7,6 +7,7 @@
 		deleteSnapshot,
 		exportJson,
 		listSnapshots,
+		openUrlExternal,
 		restoreSnapshot,
 	} from "../lib/api";
 	import { relativeTime } from "../lib/format";
@@ -160,6 +161,11 @@ async function restore(s: SnapshotInfo) {
 		try {
 			await applyConfig(draft);
 			pushToast({ kind: "success", message: "Settings saved." });
+		} catch (e) {
+			// `applyConfig` rethrows after its own toast. Catching here
+			// keeps the rejection from reaching the global handler, which
+			// paints a permanent red strip over the app.
+			pushToast({ kind: "error", message: errorString(e) });
 		} finally {
 			saving = false;
 		}
@@ -331,12 +337,12 @@ async function restore(s: SnapshotInfo) {
 						Install {$updates.offer.version}
 					</button>
 				{:else if $updates.phase === "available" && $updates.offer}
-					<a
+					<button
 						class="button-like"
-						href={LATEST_RELEASE_URL}
-						target="_blank"
-						rel="noreferrer noopener">Release page</a
+						on:click={() => openUrlExternal(LATEST_RELEASE_URL)}
 					>
+						Release page
+					</button>
 				{:else}
 					<button
 						on:click={() => checkForUpdates()}
