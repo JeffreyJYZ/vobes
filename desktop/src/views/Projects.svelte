@@ -1,390 +1,430 @@
 <script lang="ts">
-	import { onDestroy, onMount, tick } from "svelte";
-	import * as actions from "../lib/actions";
-	import * as api from "../lib/api";
-	import Select from "../components/Select.svelte";
-	import {
-		frameworkLabel,
-		languageLabel,
-		packageManagerLabel,
-		relativeTime,
-	} from "../lib/format";
-	import { renderMarkdown } from "../lib/markdown";
-	import {
-		errorString,
-		pushToast,
-		selectedVobe,
-		view,
-		vobes,
-	} from "../lib/stores";
-	import type {
-		ActivityEvent,
-		EditorApp,
-		TerminalApp,
-		TodoHit,
-	} from "../lib/types";
+import { onDestroy, onMount, tick } from "svelte";
+import Select from "../components/Select.svelte";
+import * as actions from "../lib/actions";
+import * as api from "../lib/api";
+import {
+	frameworkLabel,
+	languageLabel,
+	packageManagerLabel,
+	relativeTime,
+} from "../lib/format";
+import { renderMarkdown } from "../lib/markdown";
+import {
+	errorString,
+	pushToast,
+	selectedVobe,
+	view,
+	vobes,
+} from "../lib/stores";
+import type {
+	ActivityEvent,
+	EditorApp,
+	TerminalApp,
+	TodoHit,
+} from "../lib/types";
 
-	let detailActivity: ActivityEvent[] = [];
-	let notesDraft = "";
-	let savingNotes = false;
-	let renaming = false;
-	let nameDraft = "";
-	let savingName = false;
-	let nameInput: HTMLInputElement | null = null;
-	let busy = false;
-	let readmeText: string | null = null;
-	let readmeLoaded = false;
-	let readmeLoading = false;
-	let readmeMode: "preview" | "raw" = "preview";
-	let readmeHtml = "";
-	let todos: TodoHit[] = [];
-	let todosLoaded = false;
-	let todosLoading = false;
-	let showTodos = false;
-	let newTag = "";
-	let copyingPack = false;
-	let dirtyTimeout: number | undefined;
-	let terminals: TerminalApp[] = [];
-	let editors: EditorApp[] = [];
-	let selectedTerminal: string | null = null;
-	let selectedEditor: string | null = null;
-	let defaultTerminal: string | null = null;
-	let defaultEditor: string | null = null;
+let detailActivity: ActivityEvent[] = [];
+let notesDraft = "";
+let savingNotes = false;
+let renaming = false;
+let nameDraft = "";
+let savingName = false;
+let nameInput: HTMLInputElement | null = null;
+let busy = false;
+let readmeText: string | null = null;
+let readmeLoaded = false;
+let readmeLoading = false;
+let readmeMode: "preview" | "raw" = "preview";
+let readmeHtml = "";
+let todos: TodoHit[] = [];
+let todosLoaded = false;
+let todosLoading = false;
+let showTodos = false;
+let newTag = "";
+let copyingPack = false;
+let dirtyTimeout: number | undefined;
+let terminals: TerminalApp[] = [];
+let editors: EditorApp[] = [];
+let selectedTerminal: string | null = null;
+let selectedEditor: string | null = null;
+let defaultTerminal: string | null = null;
+let defaultEditor: string | null = null;
 
-	const DEFAULT_TERMINAL_KEY = "vobes:default-terminal";
-	const DEFAULT_EDITOR_KEY = "vobes:default-editor";
+const DEFAULT_TERMINAL_KEY = "vobes:default-terminal";
+const DEFAULT_EDITOR_KEY = "vobes:default-editor";
 
-	$: terminalOptions = terminals.map((t) => ({
-		value: t.id,
-		label: t.id === defaultTerminal ? `${t.label} (default)` : t.label,
-	}));
-	$: editorOptions = editors.map((e) => ({
-		value: e.id,
-		label: e.id === defaultEditor ? `${e.label} (default)` : e.label,
-	}));
-	$: terminalLabel =
-		terminals
-			.find((t) => t.id === selectedTerminal)
-			?.label.replace(/\s*\(default\)$/, "") ?? "Terminal";
-	$: editorLabel =
-		editors
-			.find((e) => e.id === selectedEditor)
-			?.label.replace(/\s*\(default\)$/, "") ?? "editor";
+$: terminalOptions = terminals.map((t) => ({
+	value: t.id,
+	label: t.id === defaultTerminal ? `${t.label} (default)` : t.label,
+}));
+$: editorOptions = editors.map((e) => ({
+	value: e.id,
+	label: e.id === defaultEditor ? `${e.label} (default)` : e.label,
+}));
+$: terminalLabel =
+	terminals
+		.find((t) => t.id === selectedTerminal)
+		?.label.replace(/\s*\(default\)$/, "") ?? "Terminal";
+$: editorLabel =
+	editors
+		.find((e) => e.id === selectedEditor)
+		?.label.replace(/\s*\(default\)$/, "") ?? "editor";
 
-	$: selected = $selectedVobe;
+$: selected = $selectedVobe;
 
-	$: if (selected) {
-		notesDraft = selected.notes ?? "";
-		readmeText = null;
-		readmeLoaded = false;
-		readmeHtml = "";
-		todos = [];
-		todosLoaded = false;
-		loadActivity(selected.id);
-		if (dirtyTimeout) clearTimeout(dirtyTimeout);
+$: if (selected) {
+	notesDraft = selected.notes ?? "";
+	readmeText = null;
+	readmeLoaded = false;
+	readmeHtml = "";
+	todos = [];
+	todosLoaded = false;
+	loadActivity(selected.id);
+	if (dirtyTimeout) clearTimeout(dirtyTimeout);
+}
+
+onMount(async () => {
+	try {
+		[terminals, editors] = await Promise.all([
+			api.listTerminals(),
+			api.listEditors(),
+		]);
+		const savedT = localStorage.getItem(DEFAULT_TERMINAL_KEY);
+		const savedE = localStorage.getItem(DEFAULT_EDITOR_KEY);
+		defaultTerminal =
+			savedT && terminals.some((t) => t.id === savedT)
+				? savedT
+				: (terminals.find((t) => t.is_default)?.id ?? null);
+		defaultEditor =
+			savedE && editors.some((e) => e.id === savedE)
+				? savedE
+				: (editors.find((e) => e.is_default)?.id ?? null);
+		selectedTerminal = defaultTerminal ?? terminals[0]?.id ?? null;
+		selectedEditor = defaultEditor ?? editors[0]?.id ?? null;
+	} catch (e) {
+		console.warn("list_terminals/editors failed:", e);
 	}
+});
 
-	onMount(async () => {
-		try {
-			[terminals, editors] = await Promise.all([
-				api.listTerminals(),
-				api.listEditors(),
-			]);
-			const savedT = localStorage.getItem(DEFAULT_TERMINAL_KEY);
-			const savedE = localStorage.getItem(DEFAULT_EDITOR_KEY);
-			defaultTerminal =
-				savedT && terminals.some((t) => t.id === savedT)
-					? savedT
-					: terminals.find((t) => t.is_default)?.id ?? null;
-			defaultEditor =
-				savedE && editors.some((e) => e.id === savedE)
-					? savedE
-					: editors.find((e) => e.is_default)?.id ?? null;
-			selectedTerminal = defaultTerminal ?? terminals[0]?.id ?? null;
-			selectedEditor = defaultEditor ?? editors[0]?.id ?? null;
-		} catch (e) {
-			console.warn("list_terminals/editors failed:", e);
-		}
+function setDefaultTerminal(v: string) {
+	defaultTerminal = v;
+	localStorage.setItem(DEFAULT_TERMINAL_KEY, v);
+	pushToast({
+		kind: "success",
+		message: `Default terminal: ${
+			terminals.find((t) => t.id === v)?.label ?? v
+		}.`,
 	});
+}
 
-	function setDefaultTerminal(v: string) {
-		defaultTerminal = v;
-		localStorage.setItem(DEFAULT_TERMINAL_KEY, v);
+function setDefaultEditor(v: string) {
+	defaultEditor = v;
+	localStorage.setItem(DEFAULT_EDITOR_KEY, v);
+	pushToast({
+		kind: "success",
+		message: `Default editor: ${editors.find((e) => e.id === v)?.label ?? v}.`,
+	});
+}
+
+async function loadActivity(id: string) {
+	try {
+		detailActivity = await api.vobeActivity(id, 50);
+	} catch (e) {
 		pushToast({
-			kind: "success",
-			message: `Default terminal: ${
-				terminals.find((t) => t.id === v)?.label ?? v
-			}.`,
+			kind: "error",
+			message: errorString(e),
 		});
 	}
+}
 
-	function setDefaultEditor(v: string) {
-		defaultEditor = v;
-		localStorage.setItem(DEFAULT_EDITOR_KEY, v);
+function back() {
+	selectedVobe.set(null);
+	view.set("dashboard");
+}
+
+async function doOpenInEditor(v: (typeof $vobes)[number]) {
+	busy = true;
+	try {
+		await actions.openInEditor(v, selectedEditor ?? undefined);
 		pushToast({
 			kind: "success",
-			message: `Default editor: ${
-				editors.find((e) => e.id === v)?.label ?? v
-			}.`,
+			message: `Opened ${v.name} in editor.`,
 		});
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: `Editor: ${errorString(e)}`,
+		});
+	} finally {
+		busy = false;
 	}
+}
 
-	async function loadActivity(id: string) {
-		try {
-			detailActivity = await api.vobeActivity(id, 50);
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		}
+async function doOpenTerminal(v: (typeof $vobes)[number]) {
+	busy = true;
+	try {
+		await actions.openInTerminal(v, selectedTerminal ?? "");
+		pushToast({
+			kind: "success",
+			message: `Terminal at ${v.name}.`,
+		});
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: errorString(e),
+		});
+	} finally {
+		busy = false;
 	}
+}
 
-	function back() {
+async function doReveal(v: (typeof $vobes)[number]) {
+	busy = true;
+	try {
+		await actions.revealInFinder(v);
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: errorString(e),
+		});
+	} finally {
+		busy = false;
+	}
+}
+
+async function doCopyPath(v: (typeof $vobes)[number]) {
+	await actions.copyPath(v);
+}
+
+async function doCopyContextPack(v: (typeof $vobes)[number]) {
+	copyingPack = true;
+	try {
+		const pack = await api.contextPack(v.name);
+		await api.copyText(JSON.stringify(pack, null, 2));
+		pushToast({
+			kind: "success",
+			message: `Context pack for ${v.name} copied (${pack.directory.length} entries, ${pack.activity.length} events).`,
+		});
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: `Context pack: ${errorString(e)}`,
+		});
+	} finally {
+		copyingPack = false;
+	}
+}
+
+async function togglePin(v: (typeof $vobes)[number]) {
+	busy = true;
+	try {
+		await actions.togglePin(v);
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: errorString(e),
+		});
+	} finally {
+		busy = false;
+	}
+}
+
+async function removeVobe(v: (typeof $vobes)[number]) {
+	busy = true;
+	try {
+		await actions.removeVobe(v);
+		if (await api.getVobe(v.name)) return;
 		selectedVobe.set(null);
 		view.set("dashboard");
-	}
-
-	async function doOpenInEditor(v: (typeof $vobes)[number]) {
-		busy = true;
-		try {
-			await actions.openInEditor(v, selectedEditor ?? undefined);
-			pushToast({
-				kind: "success",
-				message: `Opened ${v.name} in editor.`,
-			});
-		} catch (e) {
-			pushToast({ kind: "error", message: `Editor: ${errorString(e)}` });
-		} finally {
-			busy = false;
-		}
-	}
-
-	async function doOpenTerminal(v: (typeof $vobes)[number]) {
-		busy = true;
-		try {
-			await actions.openInTerminal(v, selectedTerminal ?? "");
-			pushToast({
-				kind: "success",
-				message: `Terminal at ${v.name}.`,
-			});
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		} finally {
-			busy = false;
-		}
-	}
-
-	async function doReveal(v: (typeof $vobes)[number]) {
-		busy = true;
-		try {
-			await actions.revealInFinder(v);
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		} finally {
-			busy = false;
-		}
-	}
-
-	async function doCopyPath(v: (typeof $vobes)[number]) {
-		await actions.copyPath(v);
-	}
-
-	async function doCopyContextPack(v: (typeof $vobes)[number]) {
-		copyingPack = true;
-		try {
-			const pack = await api.contextPack(v.name);
-			await api.copyText(JSON.stringify(pack, null, 2));
-			pushToast({
-				kind: "success",
-				message: `Context pack for ${v.name} copied (${pack.directory.length} entries, ${pack.activity.length} events).`,
-			});
-		} catch (e) {
-			pushToast({
-				kind: "error",
-				message: `Context pack: ${errorString(e)}`,
-			});
-		} finally {
-			copyingPack = false;
-		}
-	}
-
-	async function togglePin(v: (typeof $vobes)[number]) {
-		busy = true;
-		try {
-			await actions.togglePin(v);
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		} finally {
-			busy = false;
-		}
-	}
-
-	async function removeVobe(v: (typeof $vobes)[number]) {
-		busy = true;
-		try {
-			await actions.removeVobe(v);
-			if (await api.getVobe(v.name)) return;
-			selectedVobe.set(null);
-			view.set("dashboard");
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		} finally {
-			busy = false;
-		}
-	}
-
-	function startRename() {
-		if (!selected) return;
-		nameDraft = selected.name;
-		renaming = true;
-		void tick().then(() => {
-			nameInput?.focus();
-			nameInput?.select();
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: errorString(e),
 		});
+	} finally {
+		busy = false;
 	}
+}
 
-	function cancelRename() {
+function startRename() {
+	if (!selected) return;
+	nameDraft = selected.name;
+	renaming = true;
+	void tick().then(() => {
+		nameInput?.focus();
+		nameInput?.select();
+	});
+}
+
+function cancelRename() {
+	renaming = false;
+	nameDraft = "";
+}
+
+async function saveName() {
+	if (!selected) return;
+	const next = nameDraft.trim();
+	if (!next || next === selected.name) {
+		cancelRename();
+		return;
+	}
+	savingName = true;
+	try {
+		const fresh = await api.saveName(selected.name, next);
+		selectedVobe.set(fresh);
 		renaming = false;
 		nameDraft = "";
+		pushToast({
+			kind: "success",
+			message: `Renamed to ${fresh.name}.`,
+		});
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: errorString(e),
+		});
+	} finally {
+		savingName = false;
 	}
+}
 
-	async function saveName() {
-		if (!selected) return;
-		const next = nameDraft.trim();
-		if (!next || next === selected.name) {
-			cancelRename();
-			return;
+async function saveNotes() {
+	if (!selected) return;
+	savingNotes = true;
+	try {
+		const fresh = await api.saveNotes(selected.name, notesDraft.trim() || null);
+		selectedVobe.set(fresh);
+		pushToast({
+			kind: "success",
+			message: "Notes saved.",
+		});
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: errorString(e),
+		});
+	} finally {
+		savingNotes = false;
+	}
+}
+
+async function addTag() {
+	if (!selected) return;
+	const t = newTag.trim();
+	if (!t) return;
+	if (selected.tags.includes(t)) {
+		newTag = "";
+		return;
+	}
+	busy = true;
+	try {
+		const fresh = await api.setTags(selected.name, [
+			...selected.tags,
+			t,
+		]);
+		selectedVobe.set(fresh);
+		newTag = "";
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: errorString(e),
+		});
+	} finally {
+		busy = false;
+	}
+}
+
+async function removeTag(t: string) {
+	if (!selected) return;
+	busy = true;
+	try {
+		const fresh = await api.setTags(
+			selected.name,
+			selected.tags.filter((x) => x !== t),
+		);
+		selectedVobe.set(fresh);
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: errorString(e),
+		});
+	} finally {
+		busy = false;
+	}
+}
+
+async function loadReadme() {
+	if (!selected || readmeLoaded || readmeLoading) return;
+	readmeLoading = true;
+	try {
+		readmeText = await api.readReadme(selected.name);
+		readmeHtml = readmeText ? renderMarkdown(readmeText) : "";
+		readmeLoaded = true;
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: errorString(e),
+		});
+	} finally {
+		readmeLoading = false;
+	}
+}
+
+function setReadmeMode(m: "preview" | "raw") {
+	readmeMode = m;
+}
+
+async function openReadmeLink(e: MouseEvent) {
+	const target = e.target as HTMLElement | null;
+	if (!target) return;
+	const anchor = target.closest("a");
+	if (!anchor) return;
+	e.preventDefault();
+	const href = (anchor as HTMLAnchorElement).getAttribute("href");
+	if (!href) return;
+	try {
+		if (
+			/^https?:\/\//i.test(href) ||
+			/^mailto:/i.test(href) ||
+			/^tel:/i.test(href)
+		) {
+			await api.openUrlExternal(href);
+		} else {
+			await api.openPathExternal(href);
 		}
-		savingName = true;
-		try {
-			const fresh = await api.saveName(selected.name, next);
-			selectedVobe.set(fresh);
-			renaming = false;
-			nameDraft = "";
-			pushToast({ kind: "success", message: `Renamed to ${fresh.name}.` });
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		} finally {
-			savingName = false;
-		}
+	} catch (err) {
+		pushToast({
+			kind: "error",
+			message: errorString(err),
+		});
 	}
+}
 
-	async function saveNotes() {
-		if (!selected) return;
-		savingNotes = true;
-		try {
-			const fresh = await api.saveNotes(
-				selected.name,
-				notesDraft.trim() || null,
-			);
-			selectedVobe.set(fresh);
-			pushToast({ kind: "success", message: "Notes saved." });
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		} finally {
-			savingNotes = false;
-		}
+async function loadTodos() {
+	if (!selected || todosLoaded || todosLoading) return;
+	todosLoading = true;
+	try {
+		todos = await api.scrapeTodos(selected.name);
+		todosLoaded = true;
+	} catch (e) {
+		pushToast({
+			kind: "error",
+			message: errorString(e),
+		});
+	} finally {
+		todosLoading = false;
 	}
+}
 
-	async function addTag() {
-		if (!selected) return;
-		const t = newTag.trim();
-		if (!t) return;
-		if (selected.tags.includes(t)) {
-			newTag = "";
-			return;
-		}
-		busy = true;
-		try {
-			const fresh = await api.setTags(selected.name, [
-				...selected.tags,
-				t,
-			]);
-			selectedVobe.set(fresh);
-			newTag = "";
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		} finally {
-			busy = false;
-		}
-	}
+function toggleTodos() {
+	showTodos = !showTodos;
+	if (showTodos) loadTodos();
+}
 
-	async function removeTag(t: string) {
-		if (!selected) return;
-		busy = true;
-		try {
-			const fresh = await api.setTags(
-				selected.name,
-				selected.tags.filter((x) => x !== t),
-			);
-			selectedVobe.set(fresh);
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		} finally {
-			busy = false;
-		}
-	}
-
-	async function loadReadme() {
-		if (!selected || readmeLoaded || readmeLoading) return;
-		readmeLoading = true;
-		try {
-			readmeText = await api.readReadme(selected.name);
-			readmeHtml = readmeText ? renderMarkdown(readmeText) : "";
-			readmeLoaded = true;
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		} finally {
-			readmeLoading = false;
-		}
-	}
-
-	function setReadmeMode(m: "preview" | "raw") {
-		readmeMode = m;
-	}
-
-	async function openReadmeLink(e: MouseEvent) {
-		const target = e.target as HTMLElement | null;
-		if (!target) return;
-		const anchor = target.closest("a");
-		if (!anchor) return;
-		e.preventDefault();
-		const href = (anchor as HTMLAnchorElement).getAttribute("href");
-		if (!href) return;
-		try {
-			if (
-				/^https?:\/\//i.test(href) ||
-				/^mailto:/i.test(href) ||
-				/^tel:/i.test(href)
-			) {
-				await api.openUrlExternal(href);
-			} else {
-				await api.openPathExternal(href);
-			}
-		} catch (err) {
-			pushToast({ kind: "error", message: errorString(err) });
-		}
-	}
-
-	async function loadTodos() {
-		if (!selected || todosLoaded || todosLoading) return;
-		todosLoading = true;
-		try {
-			todos = await api.scrapeTodos(selected.name);
-			todosLoaded = true;
-		} catch (e) {
-			pushToast({ kind: "error", message: errorString(e) });
-		} finally {
-			todosLoading = false;
-		}
-	}
-
-	function toggleTodos() {
-		showTodos = !showTodos;
-		if (showTodos) loadTodos();
-	}
-
-	onDestroy(() => {
-		if (dirtyTimeout) clearTimeout(dirtyTimeout);
-	});
+onDestroy(() => {
+	if (dirtyTimeout) clearTimeout(dirtyTimeout);
+});
 </script>
 
 <div class="projects">

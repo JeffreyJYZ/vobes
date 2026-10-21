@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import {
-		LATEST_RELEASE_URL,
 		checkForUpdates,
 		dismissedVersion,
 		dismissOffer,
 		installNow,
+		LATEST_RELEASE_URL,
 		updates,
 	} from "../lib/updates";
 

@@ -75,7 +75,10 @@ export async function saveConfig(config: Config): Promise<ConfigDto> {
 	return invoke<ConfigDto>("save_config", { newConfig: config })
 }
 
-export async function openInTerminal(name: string, app?: string): Promise<void> {
+export async function openInTerminal(
+	name: string,
+	app?: string,
+): Promise<void> {
 	return invoke<void>("open_in_terminal", { name, app: app ?? null })
 }
 
@@ -95,10 +98,7 @@ export async function revealInFinder(name: string): Promise<void> {
 	return invoke<void>("reveal_in_finder", { name })
 }
 
-export async function saveName(
-	name: string,
-	newName: string,
-): Promise<Vobe> {
+export async function saveName(name: string, newName: string): Promise<Vobe> {
 	return invoke<Vobe>("save_name", { name, newName })
 }
 

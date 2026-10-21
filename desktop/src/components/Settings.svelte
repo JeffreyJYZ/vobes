@@ -4,6 +4,12 @@
 	import * as actions from "../lib/actions";
 	import * as api from "../lib/api";
 	import {
+		deleteSnapshot,
+		exportJson,
+		listSnapshots,
+		restoreSnapshot,
+	} from "../lib/api";
+	import {
 		applyConfig,
 		config,
 		configPath,
@@ -15,19 +21,13 @@
 		settingsDirty,
 		view,
 	} from "../lib/stores";
+	import type { Config, SnapshotInfo } from "../lib/types";
 	import {
-		deleteSnapshot,
-		exportJson,
-		listSnapshots,
-		restoreSnapshot,
-	} from "../lib/api";
-	import {
-		LATEST_RELEASE_URL,
 		checkForUpdates,
 		installNow,
+		LATEST_RELEASE_URL,
 		updates,
 	} from "../lib/updates";
-	import type { Config, SnapshotInfo } from "../lib/types";
 
 	let draft: Config | null = null;
 	let dirty = false;

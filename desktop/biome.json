@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.5.6/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
 	"vcs": {
 		"enabled": false
 	},
@@ -50,5 +50,13 @@
 			"trailingCommas": "all",
 			"arrowParentheses": "always"
 		}
-	}
+	},
+	"overrides": [
+		{
+			"includes": ["**/*.svelte"],
+			"formatter": {
+				"enabled": false
+			}
+		}
+	]
 }

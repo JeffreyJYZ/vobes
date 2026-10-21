@@ -328,16 +328,12 @@ export function parseQuery(q: string): ParsedQuery {
 		} else if (lower.startsWith("lang:")) {
 			const v = lower.slice(5)
 			if (v)
-				predicates.push(
-					(x) => (x.language ?? "").toLowerCase() === v,
-				)
+				predicates.push((x) => (x.language ?? "").toLowerCase() === v)
 			consumed = true
 		} else if (lower.startsWith("fw:")) {
 			const v = lower.slice(3)
 			if (v)
-				predicates.push(
-					(x) => (x.framework ?? "").toLowerCase() === v,
-				)
+				predicates.push((x) => (x.framework ?? "").toLowerCase() === v)
 			consumed = true
 		} else if (lower.startsWith("pm:")) {
 			const v = lower.slice(3)
@@ -538,12 +534,7 @@ export async function addSavedFilter(
 		query: query.trim(),
 		createdAt: new Date().toISOString(),
 	}
-	await api.saveSavedFilter(
-		f.id,
-		f.label,
-		f.query,
-		f.createdAt,
-	)
+	await api.saveSavedFilter(f.id, f.label, f.query, f.createdAt)
 	savedFilters.update((arr) => [f, ...arr].slice(0, 50))
 	return f
 }

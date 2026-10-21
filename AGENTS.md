@@ -19,10 +19,11 @@
 
 - **Rust.** `cargo fmt` + `cargo clippy --all-targets -- -D warnings`. CI strict.
   Run both before commit.
-- **Frontend.** `svelte-check` (0 errors target). `biome check` exists but
-  **not** gated in CI — repo has pre-existing format debt
-  (`semicolons: "asNeeded"` vs in-file semicolons). Do not reformat whole tree;
-  match surrounding file's style.
+- **Frontend.** `svelte-check` (0 errors target) and `biome check` (clean).
+  Biome formats TS/JS/JSON only: its Svelte formatter de-indents everything
+  inside `<script>` to column 0, so `**/*.svelte` has the formatter disabled
+  in `desktop/biome.json` (linting still on). Don't re-enable it.
+  Either way `bun run lint` must stay at zero errors.
 - **Commits.** Conventionalish, subject ≤ 50–70 chars. Body only when "why"
   isn't obvious. No emojis in code or commits.
 - **No comments** unless asked.

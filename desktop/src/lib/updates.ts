@@ -188,7 +188,10 @@ export async function installNow(): Promise<void> {
 				percent:
 					expected === 0
 						? null
-						: Math.min(100, Math.round((received / expected) * 100)),
+						: Math.min(
+								100,
+								Math.round((received / expected) * 100),
+							),
 			})
 		})
 		await relaunch()

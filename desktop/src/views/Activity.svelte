@@ -1,12 +1,13 @@
 <script lang="ts">
-	import { relativeTime } from "../lib/format";
+	
+	import { recentActivity } from "../lib/api";
+import { relativeTime } from "../lib/format";
 	import {
 		activity,
 		refresh,
 		scanning,
 		vobes,
 	} from "../lib/stores";
-	import { recentActivity } from "../lib/api";
 	import type { ActivityEvent, Vobe } from "../lib/types";
 
 	let kindFilter: string = "all";

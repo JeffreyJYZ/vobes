@@ -13,19 +13,19 @@
 
 	// Keep the menu inside the viewport. Measure after layout, then
 	// nudge if it would overflow right or bottom.
-	async function place() {
+	async function place(px = x, py = y) {
 		await tick();
 		if (!menuEl) return;
 		const r = menuEl.getBoundingClientRect();
 		const vw = window.innerWidth;
 		const vh = window.innerHeight;
-		if (r.right > vw - 8) posX = Math.max(8, x - r.width);
-		if (r.bottom > vh - 8) posY = Math.max(8, y - r.height);
+		if (r.right > vw - 8) posX = Math.max(8, px - r.width);
+		if (r.bottom > vh - 8) posY = Math.max(8, py - r.height);
 	}
 
 	onMount(place);
 
-	$: x, y, place();
+	$: place(x, y);
 </script>
 
 {#if items.length > 0}

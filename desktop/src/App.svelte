@@ -8,6 +8,7 @@
 	import Sidebar from "./components/Sidebar.svelte";
 	import Toast from "./components/Toast.svelte";
 	import UpdateNotice from "./components/UpdateNotice.svelte";
+	import { addVobe } from "./lib/api";
 	import { modKeyLabel } from "./lib/format";
 	import { isTypingTarget, matchShortcut, shortcuts } from "./lib/keyboard";
 	import {
@@ -28,7 +29,6 @@
 		view,
 		vobes,
 	} from "./lib/stores";
-	import { addVobe } from "./lib/api";
 	import Activity from "./views/Activity.svelte";
 	import Dashboard from "./views/Dashboard.svelte";
 	import Projects from "./views/Projects.svelte";
