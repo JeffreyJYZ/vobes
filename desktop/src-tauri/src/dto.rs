@@ -58,6 +58,27 @@ pub struct ActivityDto {
     pub actor: String,
 }
 
+/// What one sync pass found.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct SyncReportDto {
+    /// Projects discovered for the first time.
+    pub new: usize,
+    /// Tracked projects whose stack or git state changed.
+    pub changed: usize,
+    /// Tracked projects that came back identical.
+    pub unchanged: usize,
+}
+
+impl From<vobes_core::SyncReport> for SyncReportDto {
+    fn from(r: vobes_core::SyncReport) -> Self {
+        Self {
+            new: r.new,
+            changed: r.changed,
+            unchanged: r.unchanged,
+        }
+    }
+}
+
 impl From<&vobes_core::Vobe> for VobeDto {
     fn from(v: &vobes_core::Vobe) -> Self {
         Self {

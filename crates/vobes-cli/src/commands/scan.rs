@@ -23,8 +23,9 @@ pub fn run(app: &App) -> Result<()> {
         return Ok(());
     }
 
-    let mut added = 0usize;
-    let mut updated = 0usize;
+    let mut new = 0usize;
+    let mut changed = 0usize;
+    let mut unchanged = 0usize;
     let bar = indicatif::ProgressBar::new(roots.len() as u64);
 
     for root in &roots {
@@ -38,28 +39,28 @@ pub fn run(app: &App) -> Result<()> {
         for (path, detection) in pairs {
             let path = absolute_normalized(&path);
             let existing = app.store.get_vobe_by_path(&path)?;
-            let mut vobe = vobe_from_detection(&path, &detection)?;
+            let detected = vobe_from_detection(&path, &detection)?;
             if let Some(prev) = existing {
                 // Preserve identity + user fields, refresh the rest.
-                vobe.id = prev.id;
-                vobe.created_at = prev.created_at;
-                vobe.name = prev.name;
-                vobe.tags = prev.tags;
-                vobe.notes = prev.notes;
-                vobe.pinned = prev.pinned;
-                vobe.last_opened = prev.last_opened;
-                vobe.touch_modified();
-                app.store.upsert_vobe(&vobe)?;
-                updated += 1;
+                let (merged, did_change) = prev.merge_detected(&detected);
+                app.store.upsert_vobe(&merged)?;
+                if did_change {
+                    changed += 1;
+                } else {
+                    unchanged += 1;
+                }
             } else {
-                app.store.upsert_vobe(&vobe)?;
+                app.store.upsert_vobe(&detected)?;
                 app.store.record_activity(
-                    &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Scanned)
+                    &ActivityEvent::now_env(detected.id.clone(), ActivityKind::Scanned)
                         .with_detail("vbs scan"),
                 )?;
-                vobe.touch_modified();
-                added += 1;
-                bar.println(format!("  + {} ({})", vobe.name, vobe.path.display()));
+                new += 1;
+                bar.println(format!(
+                    "  + {} ({})",
+                    detected.name,
+                    detected.path.display()
+                ));
             }
         }
         bar.inc(1);
@@ -67,7 +68,7 @@ pub fn run(app: &App) -> Result<()> {
     bar.finish_and_clear();
 
     println!(
-        "scanned {added} new, {updated} refreshed across {} roots",
+        "scanned {new} new, {changed} changed, {unchanged} unchanged across {} roots",
         roots.len()
     );
     Ok(())

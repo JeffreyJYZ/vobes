@@ -114,10 +114,10 @@ async function notifyBehindSummary(allVobes: Vobe[], _recentEvents: number) {
 export async function doSync(): Promise<void> {
 	scanning.set(true)
 	try {
-		const [added, updated] = await api.sync()
+		const report = await api.sync()
 		pushToast({
 			kind: "success",
-			message: `Sync: +${added} new, ${updated} refreshed.`,
+			message: `Sync: ${report.new} new, ${report.changed} changed, ${report.unchanged} unchanged.`,
 		})
 		// The scan is done, so drop the spinner before the refresh — the
 		// refresh owns its own in-flight guard.

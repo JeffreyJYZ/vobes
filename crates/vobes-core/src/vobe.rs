@@ -129,6 +129,56 @@ impl Vobe {
     pub fn touch_modified(&mut self) {
         self.last_modified = Some(Utc::now());
     }
+
+    /// Whether the *detected* state differs from `other`.
+    ///
+    /// Only the fields the scanner owns count: the stack and the git
+    /// state. The user's fields (name, tags, notes, pin) are theirs, and
+    /// `last_modified` moves on every scan, so including either would
+    /// report every project as changed.
+    pub fn detection_differs(&self, other: &Vobe) -> bool {
+        self.framework != other.framework
+            || self.language != other.language
+            || self.package_manager != other.package_manager
+            || self.git != other.git
+    }
+
+    /// Merge a freshly detected vobe into the stored one.
+    ///
+    /// The detected stack and git state win; the user's fields and the
+    /// identity are carried over from the stored vobe. Returns the merged
+    /// vobe and whether anything actually changed.
+    pub fn merge_detected(&self, detected: &Vobe) -> (Vobe, bool) {
+        let mut merged = detected.clone();
+        merged.id = self.id.clone();
+        merged.created_at = self.created_at;
+        merged.name = self.name.clone();
+        merged.tags = self.tags.clone();
+        merged.notes = self.notes.clone();
+        merged.pinned = self.pinned;
+        merged.last_opened = self.last_opened;
+        let changed = self.detection_differs(&merged);
+        merged.touch_modified();
+        (merged, changed)
+    }
+}
+
+/// What one sync pass found.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SyncReport {
+    /// Projects discovered for the first time.
+    pub new: usize,
+    /// Tracked projects whose stack or git state changed.
+    pub changed: usize,
+    /// Tracked projects that came back identical.
+    pub unchanged: usize,
+}
+
+impl SyncReport {
+    /// Total projects seen.
+    pub fn total(&self) -> usize {
+        self.new + self.changed + self.unchanged
+    }
 }
 
 impl Default for Vobe {

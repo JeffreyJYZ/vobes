@@ -69,6 +69,58 @@ fn vobe_new_has_defaults() {
 }
 
 #[test]
+fn merge_detected_keeps_user_fields_and_reports_change() {
+    let mut stored = Vobe::new("my-name", "/tmp/demo");
+    stored.add_tag("work");
+    stored.notes = Some("keep me".into());
+    stored.pinned = true;
+    stored.language = Some("Rust".into());
+    stored.touch_opened();
+    let opened = stored.last_opened;
+
+    // Same detection -> unchanged.
+    let mut detected = Vobe::new("detected-name", "/tmp/demo");
+    detected.language = Some("Rust".into());
+    let (merged, changed) = stored.merge_detected(&detected);
+    assert!(!changed, "same detection must not count as changed");
+    assert_eq!(merged.name, "my-name", "the user's name wins");
+    assert_eq!(merged.tags, vec!["work".to_string()]);
+    assert_eq!(merged.notes.as_deref(), Some("keep me"));
+    assert!(merged.pinned);
+    assert_eq!(merged.last_opened, opened);
+    assert_eq!(merged.id, stored.id);
+    assert_eq!(merged.language.as_deref(), Some("Rust"));
+
+    // Changed stack -> reported as changed.
+    let mut detected2 = Vobe::new("detected-name", "/tmp/demo");
+    detected2.language = Some("TypeScript".into());
+    let (merged2, changed2) = stored.merge_detected(&detected2);
+    assert!(changed2, "a different language must count as changed");
+    assert_eq!(merged2.language.as_deref(), Some("TypeScript"));
+    assert_eq!(merged2.name, "my-name");
+
+    // Changed git state -> reported as changed.
+    let mut detected3 = Vobe::new("detected-name", "/tmp/demo");
+    detected3.git = Some(GitInfo::clean("main"));
+    let (_, changed3) = stored.merge_detected(&detected3);
+    assert!(changed3, "a different git state must count as changed");
+}
+
+#[test]
+fn detection_differs_ignores_user_fields_and_timestamps() {
+    let mut a = Vobe::new("a", "/tmp/a");
+    a.touch_modified();
+    let mut b = Vobe::new("b", "/tmp/b");
+    b.touch_modified();
+    b.add_tag("other");
+    b.notes = Some("different".into());
+    b.pinned = true;
+    // The name, path, tags, notes, pin and timestamps are the user's or
+    // the clock's — none of them mean the project changed.
+    assert!(!a.detection_differs(&b));
+}
+
+#[test]
 fn vobe_tags_add_remove_query() {
     let mut v = Vobe::new("demo", "/tmp/demo");
     assert!(v.add_tag("work"));

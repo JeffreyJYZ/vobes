@@ -43,8 +43,17 @@ export async function vobeActivity(
 	})
 }
 
-export async function sync(): Promise<[number, number]> {
-	return invoke<[number, number]>("sync")
+export type SyncReport = {
+	/** Projects discovered for the first time. */
+	new: number
+	/** Tracked projects whose stack or git state changed. */
+	changed: number
+	/** Tracked projects that came back identical. */
+	unchanged: number
+}
+
+export async function sync(): Promise<SyncReport> {
+	return invoke<SyncReport>("sync")
 }
 
 export async function resetAndRescan(): Promise<number> {

@@ -6,12 +6,12 @@ use std::sync::Arc;
 use serde::Serialize;
 use tauri::State;
 
-use vobes_core::{ActivityEvent, ActivityKind, Result, VobeId};
+use vobes_core::{ActivityEvent, ActivityKind, Result, SyncReport, VobeId};
 use vobes_store::{Filter, SavedFilter, Sort};
 
 use crate::commands::shared::{absolute_normalized, lookup_vobe, vobe_from_detection};
 use crate::ctx::DesktopCtx;
-use crate::dto::{ActivityDto, VobeDto};
+use crate::dto::{ActivityDto, SyncReportDto, VobeDto};
 
 /// List all tracked vobes (excluding archived).
 #[tauri::command]
@@ -90,16 +90,17 @@ pub async fn reset_and_rescan(state: State<'_, Arc<DesktopCtx>>) -> Result<usize
 }
 
 /// Sync: re-scan roots, refresh existing vobes, add new ones.
+///
+/// Returns how many projects were new, changed and unchanged.
 #[tauri::command]
-pub async fn sync(state: State<'_, Arc<DesktopCtx>>) -> Result<(usize, usize)> {
+pub async fn sync(state: State<'_, Arc<DesktopCtx>>) -> Result<SyncReportDto> {
     let _guard = state
         .scan_lock
         .lock()
         .map_err(|e| vobes_core::Error::internal(format!("sync lock: {e}")))?;
     let config = state.config_snapshot();
     let scanner = state.scanner_snapshot();
-    let mut added = 0usize;
-    let mut updated = 0usize;
+    let mut report = SyncReport::default();
     for root in config.resolved_roots() {
         if !root.exists() {
             continue;
@@ -108,29 +109,30 @@ pub async fn sync(state: State<'_, Arc<DesktopCtx>>) -> Result<(usize, usize)> {
         for (path, detection) in pairs {
             let path = absolute_normalized(&path);
             let existing = state.store.get_vobe_by_path(&path)?;
-            let mut vobe = vobe_from_detection(&path, &detection)?;
+            let detected = vobe_from_detection(&path, &detection)?;
             if let Some(prev) = existing {
-                vobe.id = prev.id;
-                vobe.created_at = prev.created_at;
-                vobe.name = prev.name;
-                vobe.tags = prev.tags;
-                vobe.notes = prev.notes;
-                vobe.pinned = prev.pinned;
-                vobe.last_opened = prev.last_opened;
-                vobe.touch_modified();
-                state.store.upsert_vobe(&vobe)?;
-                updated += 1;
+                let (merged, changed) = prev.merge_detected(&detected);
+                state.store.upsert_vobe(&merged)?;
+                if changed {
+                    report.changed += 1;
+                } else {
+                    report.unchanged += 1;
+                }
             } else {
-                state.store.upsert_vobe(&vobe)?;
+                state.store.upsert_vobe(&detected)?;
                 state.store.record_activity(
-                    &ActivityEvent::now_env(vobe.id.clone(), ActivityKind::Scanned)
+                    &ActivityEvent::now_env(detected.id.clone(), ActivityKind::Scanned)
                         .with_detail("desktop sync"),
                 )?;
-                added += 1;
+                report.new += 1;
             }
         }
     }
-    Ok((added, updated))
+    Ok(SyncReportDto {
+        new: report.new,
+        changed: report.changed,
+        unchanged: report.unchanged,
+    })
 }
 
 /// Manually add a vobe for a path.

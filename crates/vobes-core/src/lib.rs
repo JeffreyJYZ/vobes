@@ -18,7 +18,7 @@ pub use error::{Error, ParseIdError, Result, VobeId};
 pub use git::{Commit, GitInfo};
 pub use path::{normalize, normalize_str};
 pub use query::{find_by_name, Predicate, Query};
-pub use vobe::{Vobe, ARCHIVED_TAG};
+pub use vobe::{SyncReport, Vobe, ARCHIVED_TAG};
 
 /// Re-export chrono DateTime for downstream convenience.
 pub use chrono::{DateTime, Utc};

@@ -197,16 +197,12 @@ async function restore(s: SnapshotInfo) {
 <div class="settings">
 	<div class="head">
 		<h2>Settings</h2>
-		<div class="row">
-			<button class="primary" on:click={save} disabled={!dirty || saving}>
-				{saving ? "Saving…" : "Save changes"}
-			</button>
-		</div>
 	</div>
 
 	{#if !draft}
 		<div class="muted">Loading…</div>
 	{:else}
+		<div class="group-label">Scanning</div>
 		<section class="block">
 			<h3>Scan roots</h3>
 			<p class="muted">
@@ -291,6 +287,7 @@ async function restore(s: SnapshotInfo) {
 			</div>
 		</section>
 
+		<div class="group-label">Appearance</div>
 		<section class="block">
 			<h3>Display</h3>
 			<div class="grid">
@@ -305,6 +302,7 @@ async function restore(s: SnapshotInfo) {
 			</div>
 		</section>
 
+		<div class="group-label">Application</div>
 		<section class="block">
 			<h3>Updates</h3>
 			<p class="muted small">
@@ -360,6 +358,7 @@ async function restore(s: SnapshotInfo) {
 			{/if}
 		</section>
 
+		<div class="group-label">Data</div>
 		<section class="block">
 			<h3>Data locations</h3>
 			<p class="muted small">
@@ -425,6 +424,7 @@ async function restore(s: SnapshotInfo) {
 			{/if}
 		</section>
 
+		<div class="group-label">Desktop</div>
 		<section class="block">
 			<h3>Desktop</h3>
 			<p class="muted small">Desktop only. The CLI ignores these.</p>
@@ -439,6 +439,7 @@ async function restore(s: SnapshotInfo) {
 			</div>
 		</section>
 
+		<div class="group-label danger-label">Irreversible</div>
 		<section class="block danger-zone">
 			<h3>Danger zone</h3>
 			<p class="muted small">
@@ -487,10 +488,8 @@ async function restore(s: SnapshotInfo) {
 			</div>
 		</section>
 
-		<div class="actions">
-			{#if dirty}
-				<span class="unsaved">Unsaved changes</span>
-			{/if}
+		<div class="actions" class:visible={dirty}>
+			<span class="unsaved">Unsaved changes</span>
 			<button on:click={done}>Done</button>
 			<button class="primary" on:click={save} disabled={!dirty || saving}>
 				{saving ? "Saving…" : "Save changes"}
@@ -503,15 +502,22 @@ async function restore(s: SnapshotInfo) {
 	.settings {
 		max-width: 720px;
 		margin: 0 auto;
+		/* Room for the floating action pill to sit clear of the last
+		   section instead of over it. */
+		padding-bottom: 24px;
 	}
 	.head {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		margin-bottom: 18px;
+		gap: 12px;
+		margin-bottom: 22px;
 	}
 	.head h2 {
 		margin: 0;
+		font-size: 20px;
+		font-weight: 700;
+		letter-spacing: -0.01em;
 	}
 	.row {
 		display: flex;
@@ -540,7 +546,21 @@ async function restore(s: SnapshotInfo) {
 		border: 1px solid var(--border);
 		border-radius: 12px;
 		padding: 18px 20px;
-		margin-bottom: 14px;
+		margin-bottom: 12px;
+	}
+	.group-label {
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.09em;
+		text-transform: uppercase;
+		color: var(--fg-faint);
+		margin: 0 0 8px;
+	}
+	.group-label:not(:first-child) {
+		margin-top: 26px;
+	}
+	.danger-label {
+		color: var(--danger);
 	}
 	.block h3 {
 		margin: 0 0 4px;
@@ -549,6 +569,7 @@ async function restore(s: SnapshotInfo) {
 	}
 	.block .muted {
 		margin: 0 0 10px;
+		line-height: 1.55;
 	}
 	.list {
 		display: flex;
@@ -616,15 +637,35 @@ async function restore(s: SnapshotInfo) {
 		align-items: center;
 		justify-content: flex-end;
 		gap: 8px;
-		margin-top: 12px;
+		/* Floats above the content as a pill, not a bar sliced through
+		   it. The old full-width sticky bar cut the card behind it in
+		   half. */
 		position: sticky;
-		bottom: 0;
-		padding: 12px 0;
-		background: var(--bg);
-		border-top: 1px solid var(--border);
+		bottom: 16px;
+		z-index: 5;
+		margin: 20px auto 0;
+		padding: 8px 10px 8px 16px;
+		width: fit-content;
+		background: var(--bg-elevated);
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		box-shadow: var(--shadow-md);
+		/* Hidden until there is something to save — it is a floating
+		   action, not a permanent strip. */
+		opacity: 0;
+		pointer-events: none;
+		transform: translateY(6px);
+		transition:
+			opacity 0.16s ease,
+			transform 0.16s ease;
+	}
+	.actions.visible {
+		opacity: 1;
+		pointer-events: auto;
+		transform: none;
 	}
 	.unsaved {
-		margin-right: auto;
+		margin-right: 4px;
 		font-size: 12px;
 		font-weight: 600;
 		color: var(--warn);
