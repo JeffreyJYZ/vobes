@@ -114,6 +114,18 @@ jobs:
             exit 1
           fi
           echo "Bumped:${{ steps.inspect.outputs.bumped_crates }}"
+          # `cargo info` is useless as a registry probe from inside the
+          # workspace: it resolves the local member and exits 0 for a
+          # version that was never published. Ask crates.io directly,
+          # from a scratch directory, so the answer is about the registry.
+          probe_registry() {
+            local name=$1 ver=$2 dir
+            dir=$(mktemp -d)
+            if ( cd "$dir" && cargo info "$name@$ver" >/dev/null 2>&1 ); then
+              return 0
+            fi
+            return 1
+          }
           # Fixed dependency order: cargo refuses to publish a crate whose
           # newly-bumped dependency is not on the registry yet, and the
           # bump list arrives in path order (vobes-cli first).
@@ -127,7 +139,7 @@ jobs:
             if [ -z "$ver" ]; then
               continue
             fi
-            if cargo info "$name@$ver" >/dev/null 2>&1; then
+            if probe_registry "$name" "$ver"; then
               echo "::notice::$name $ver already on crates.io; skipping."
               continue
             fi
