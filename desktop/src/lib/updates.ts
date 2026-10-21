@@ -156,13 +156,15 @@ export async function checkForUpdates(): Promise<void> {
 	}
 
 	let message: string | null = null
-	if (!offer && running) {
+	if (!offer && running && !apiThrottled()) {
 		try {
 			const newest = await latestVersion()
+			lastApiAt = Date.now()
 			if (isNewer(newest, running)) {
 				offer = { kind: "github", version: newest }
 			}
 		} catch (e) {
+			lastApiAt = Date.now()
 			const release = e instanceof Error ? e.message : String(e)
 			message = pluginError ? `${pluginError}; ${release}` : release
 		}
@@ -182,13 +184,26 @@ export async function checkForUpdates(): Promise<void> {
 /// A periodic sweep that only runs when no offer is already waiting: an
 /// installed app left open for days would otherwise never hear about a
 /// release, which is what made "checks on launch" look like "never checks".
-const POLL_MS = 30 * 60 * 1000
-const STALE_MS = 15 * 60 * 1000
+const POLL_MS = 30 * 1000
+const FOCUS_STALE_MS = 10 * 1000
+
+/// The Tauri path reads `releases/latest/download/latest.json`, a plain release
+/// asset with no API budget. The GitHub API fallback is unauthenticated and
+/// capped at 60 requests an hour per IP, so a 30 s poll would spend 120 of them:
+/// it runs at most once every ten minutes and the plugin path keeps the fast
+/// cadence.
+const API_MIN_MS = 10 * 60 * 1000
+
+let lastApiAt = 0
+
+function apiThrottled(): boolean {
+	return Date.now() - lastApiAt < API_MIN_MS
+}
 
 let watcher: (() => void) | null = null
 
-/// Check now, then every half hour, and on focus when the last check is
-/// older than the short interval. Idempotent — mounting twice keeps one timer.
+/// Check now, then every 30 seconds, and on focus when the last check is
+/// older than ten seconds. Idempotent — mounting twice keeps one timer.
 export function startUpdateWatcher(): () => void {
 	if (watcher) return watcher
 	const sweep = (): void => {
@@ -204,7 +219,9 @@ export function startUpdateWatcher(): () => void {
 	}
 	const onFocus = (): void => {
 		const { checkedAt } = get(updates)
-		if (checkedAt !== null && Date.now() - checkedAt < STALE_MS) return
+		if (checkedAt !== null && Date.now() - checkedAt < FOCUS_STALE_MS) {
+			return
+		}
 		sweep()
 	}
 	void checkForUpdates()

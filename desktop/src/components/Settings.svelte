@@ -302,9 +302,9 @@ async function restore(s: SnapshotInfo) {
 		<section class="block">
 			<h3>Updates</h3>
 			<p class="muted small">
-				Vobes checks on launch, every 30 minutes, and when the window
-				regains focus. A downloaded update is verified against the
-				pinned signature before it installs.
+				Vobes checks every 30 seconds, and as soon as the window regains
+				focus. A downloaded update is verified against the pinned
+				signature before it installs.
 			</p>
 			<div class="row gap updater-row">
 				<span class="mono small">
