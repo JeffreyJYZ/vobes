@@ -1311,7 +1311,7 @@ onDestroy(() => {
 	}
 	.danger-zone h3 {
 		color: var(--danger);
-		margin: 0 0 10px;
+		margin: 0 0 14px;
 	}
 	.danger-row {
 		display: grid;
