@@ -7,8 +7,9 @@
 	--fg-muted: #6b7280;
 	--fg-faint: #9ca3af;
 	--border: #e6e8ec;
-	--accent: #4f7cff;
-	--accent-soft: #eaf0ff;
+	--accent: #3f3f46;
+	--accent-fg: #ffffff;
+	--accent-soft: #ededf0;
 	--danger: #ef4444;
 	--warn: #f59e0b;
 	--success: #10b981;
@@ -27,8 +28,9 @@
 	--fg-muted: #9aa0a8;
 	--fg-faint: #6b7079;
 	--border: #23262c;
-	--accent: #6b93ff;
-	--accent-soft: #1c2740;
+	--accent: #d4d4d8;
+	--accent-fg: #121214;
+	--accent-soft: #26262b;
 	--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
 	--shadow-md: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
@@ -99,7 +101,7 @@ button:active {
 }
 button.primary {
 	background: var(--accent);
-	color: #fff;
+	color: var(--accent-fg);
 	border-color: var(--accent);
 	font-weight: 500;
 }
@@ -150,7 +152,7 @@ button.danger:hover {
 	height: 26px;
 	color: var(--accent);
 	flex: none;
-	filter: drop-shadow(0 2px 4px rgba(79, 124, 255, 0.25));
+	filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.18));
 }
 .brand h1 {
 	font-size: 17px;
