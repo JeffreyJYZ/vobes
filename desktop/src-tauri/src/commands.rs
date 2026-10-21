@@ -645,6 +645,28 @@ pub async fn open_path_external(app: tauri::AppHandle, path: String) -> Result<(
     Ok(())
 }
 
+/// Open an external URL in the OS browser via tauri-plugin-opener.
+/// Kept separate from `open_path_external`: a URL is not a filesystem path,
+/// so the path command's existence check would reject every one of them.
+#[tauri::command]
+pub async fn open_url_external(app: tauri::AppHandle, url: String) -> Result<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let lower = url.trim().to_ascii_lowercase();
+    if !(lower.starts_with("http://")
+        || lower.starts_with("https://")
+        || lower.starts_with("mailto:")
+        || lower.starts_with("tel:"))
+    {
+        return Err(vobes_core::Error::invalid(format!(
+            "refusing to open {url}"
+        )));
+    }
+    app.opener()
+        .open_url(url, None::<String>)
+        .map_err(|e| vobes_core::Error::internal(format!("opener: {e}")))?;
+    Ok(())
+}
+
 /// Saved-filter DTO — mirrors `vobes_store::SavedFilter` for IPC.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SavedFilterDto {

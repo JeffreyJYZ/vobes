@@ -391,7 +391,12 @@ async function openReadmeLink(e: MouseEvent) {
 		) {
 			await api.openUrlExternal(href);
 		} else {
-			await api.openPathExternal(href);
+			// A relative README link points inside the project, so resolve
+			// it against the project root — not the app's working directory.
+			const path = href.startsWith("/")
+				? href
+				: `${selected?.path ?? ""}/${href}`;
+			await api.openPathExternal(path);
 		}
 	} catch (err) {
 		pushToast({

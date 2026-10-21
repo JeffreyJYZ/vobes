@@ -80,8 +80,14 @@ impl Store for SqliteStore {
             let mut args: Vec<rusqlite::types::Value> = Vec::new();
 
             if let Some(tag) = &filter.tag {
-                sql.push_str(" AND tags LIKE ?1");
-                args.push(format!("%\"{tag}\"%").into());
+                // Escape the LIKE wildcards so a tag named `a%b` matches
+                // itself and nothing else.
+                sql.push_str(" AND tags LIKE ?1 ESCAPE '\\'");
+                let escaped = tag
+                    .replace('\\', "\\\\")
+                    .replace('%', "\\%")
+                    .replace('_', "\\_");
+                args.push(format!("%\"{escaped}\"%").into());
             }
             if filter.only_dirty {
                 sql.push_str(" AND git_dirty = 1");
@@ -278,28 +284,46 @@ impl Store for SqliteStore {
         crate::json::export_to_file(path, &vobes, &activity)
     }
 
+    /// Restore a snapshot. The snapshot *replaces* the current state, so
+    /// the old rows go first — a merge would leave vobes behind that the
+    /// snapshot never had.
+    ///
+    /// The whole restore is one transaction. Without an explicit rollback
+    /// on error, a failed import leaves the transaction open and every
+    /// later write on this connection is silently discarded on close.
     fn import_json(&self, path: &Path) -> Result<()> {
         let snap = crate::json::import_from_file(path)?;
         self.with_conn(|conn| {
             conn.execute_batch("BEGIN;")
                 .map_err(|e| vobes_core::Error::storage(format!("begin: {e}")))?;
-            for v in &snap.vobes {
-                upsert_vobe_tx(conn, v)?;
-            }
-            for e in &snap.activity {
-                let kind = serde_json::to_string(&e.kind)
-                    .map_err(|er| vobes_core::Error::storage(format!("encode kind: {er}")))?;
-                conn.execute(
-                    "INSERT INTO activity (vobe_id, kind, timestamp, detail, actor) VALUES (?1, ?2, ?3, ?4, ?5)",
-                    params![
-                        e.vobe_id.as_str(),
-                        kind,
-                        e.timestamp.to_rfc3339(),
-                        e.detail,
-                        e.actor,
-                    ],
-                )
-                .map_err(|er| vobes_core::Error::storage(format!("import activity: {er}")))?;
+            let restore = (|| -> Result<()> {
+                conn.execute("DELETE FROM activity", [])
+                    .map_err(|e| vobes_core::Error::storage(format!("clear activity: {e}")))?;
+                conn.execute("DELETE FROM vobes", [])
+                    .map_err(|e| vobes_core::Error::storage(format!("clear vobes: {e}")))?;
+                for v in &snap.vobes {
+                    upsert_vobe_tx(conn, v)?;
+                }
+                for e in &snap.activity {
+                    let kind = serde_json::to_string(&e.kind)
+                        .map_err(|er| vobes_core::Error::storage(format!("encode kind: {er}")))?;
+                    conn.execute(
+                        "INSERT INTO activity (vobe_id, kind, timestamp, detail, actor) VALUES (?1, ?2, ?3, ?4, ?5)",
+                        params![
+                            e.vobe_id.as_str(),
+                            kind,
+                            e.timestamp.to_rfc3339(),
+                            e.detail,
+                            e.actor,
+                        ],
+                    )
+                    .map_err(|er| vobes_core::Error::storage(format!("import activity: {er}")))?;
+                }
+                Ok(())
+            })();
+            if let Err(e) = restore {
+                let _ = conn.execute_batch("ROLLBACK;");
+                return Err(e);
             }
             conn.execute_batch("COMMIT;")
                 .map_err(|e| vobes_core::Error::storage(format!("commit: {e}")))?;

@@ -188,7 +188,7 @@ export async function deleteSnapshot(path: string): Promise<void> {
 }
 
 export async function openUrlExternal(url: string): Promise<void> {
-	return invoke<void>("open_path_external", { path: url })
+	return invoke<void>("open_url_external", { url })
 }
 
 export async function copyText(text: string): Promise<void> {

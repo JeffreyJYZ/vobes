@@ -40,6 +40,32 @@ jobs:
         if: always()
         run: cargo build --release -p vobes-cli
 
+  frontend:
+    name: frontend (lint + typecheck + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+
+      - name: install frontend deps
+        working-directory: desktop
+        run: bun install --frozen-lockfile
+
+      - name: lint
+        working-directory: desktop
+        run: bun run lint
+
+      - name: type check
+        working-directory: desktop
+        run: bunx svelte-check --tsconfig ./tsconfig.json
+
+      - name: test
+        working-directory: desktop
+        run: bun test
+
   desktop:
     name: desktop (tauri build)
     runs-on: ${{ matrix.os }}

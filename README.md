@@ -115,7 +115,9 @@ key (case-insensitive, whitespace-tolerant):
 - `tag:rust` — only vobes tagged `rust`
 - `lang:rust` / `fw:react` / `pm:pnpm` — language, framework, package manager
 - `is:dirty` / `is:behind` / `is:pinned` / `is:attention` — git/pin flags
-- `name:foo` — name substring; bare words are also fuzzy-matched
+- `name:foo` — name substring
+- bare words — each one must match the name, path or a tag on its own, so
+  `rust web` means "rust **and** web", not the literal string "rust web"
 
 A saved filter is just a named query — pin it to the sidebar for a
 personal workspace scoped to a tag, language, or attention slice.
@@ -266,7 +268,7 @@ Both faces talk to the same core. Capabilities should match; gaps are bugs.
 | Rename vobe | `rename <name> <new>` | "Rename" in Projects view | names are unique; `sync` keeps a custom name |
 | Open in editor | `open <name>` | "Open in editor" | desktop uses shell plugin |
 | Export JSON snapshot | `export` | Settings → Snapshots → Export now | both write `snapshots_dir/vobes-<ts>.json` |
-| Restore snapshot | `import` (planned) | Settings → Snapshots → Restore | CLI import pending — see `Store::import_json` |
+| Restore snapshot | `import` (planned) | Settings → Snapshots → Restore | replaces current vobes + activity; CLI import pending |
 | Pin vobe | — (set via store) | pin button, `set_pinned` | desktop-only surface for now |
 | Tags | — (set via store) | Projects view tag editor | desktop-only surface for now |
 | Notes | — (set via store) | Projects notes editor | desktop-only surface for now |

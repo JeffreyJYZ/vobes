@@ -119,20 +119,25 @@ export function dismissOffer(): void {
 
 /// Ask both paths for a newer release. A second call while one is in flight
 /// is a no-op, so the notice and the Settings section can't race.
+///
+/// A poll that finds the release we already offer keeps the existing
+/// handle instead of replacing it, so the state machine stays quiet and
+/// the offer is still there to be superseded by the next version.
 export async function checkForUpdates(): Promise<void> {
 	const phase = get(updates).phase
 	if (phase === "checking" || phase === "downloading") return
 	const previous = get(updates).offer
-	if (previous?.kind === "updater") {
-		void previous.update.close().catch(() => {})
+	// Only a first check shows "checking…". A poll behind an existing offer
+	// must not flicker the UI every 30 seconds.
+	if (!previous) {
+		patch({
+			phase: "checking",
+			offer: null,
+			percent: null,
+			message: null,
+			pluginError: null,
+		})
 	}
-	patch({
-		phase: "checking",
-		offer: null,
-		percent: null,
-		message: null,
-		pluginError: null,
-	})
 
 	let running: string | null = null
 	try {
@@ -143,16 +148,41 @@ export async function checkForUpdates(): Promise<void> {
 
 	let offer: UpdateOffer | null = null
 	let pluginError: string | null = null
+	let sameOffer = false
 	try {
 		const found = await check()
 		if (found) {
-			offer = { kind: "updater", version: found.version, update: found }
+			if (found.version === dismissedVersion()) {
+				// The user already dismissed this version. Offer nothing, so
+				// the poll keeps running and can still find a newer one.
+				void found.close().catch(() => {})
+			} else if (
+				previous?.kind === "updater" &&
+				previous.version === found.version
+			) {
+				void found.close().catch(() => {})
+				offer = previous
+				sameOffer = true
+			} else {
+				if (previous?.kind === "updater") {
+					void previous.update.close().catch(() => {})
+				}
+				offer = {
+					kind: "updater",
+					version: found.version,
+					update: found,
+				}
+			}
+		} else if (previous?.kind === "updater") {
+			void previous.update.close().catch(() => {})
 		}
 	} catch (e) {
 		// Plugin absent, offline, or no artifact for this platform — the
 		// GitHub path below still answers "is there a newer version", but
-		// the reason stays visible in Settings.
+		// the reason stays visible in Settings. A failed check is not proof
+		// the offer is gone, so an existing offer stays.
 		pluginError = e instanceof Error ? e.message : String(e)
+		if (previous) offer = previous
 	}
 
 	let message: string | null = null
@@ -160,7 +190,7 @@ export async function checkForUpdates(): Promise<void> {
 		try {
 			const newest = await latestVersion()
 			lastApiAt = Date.now()
-			if (isNewer(newest, running)) {
+			if (isNewer(newest, running) && newest !== dismissedVersion()) {
 				offer = { kind: "github", version: newest }
 			}
 		} catch (e) {
@@ -168,6 +198,15 @@ export async function checkForUpdates(): Promise<void> {
 			const release = e instanceof Error ? e.message : String(e)
 			message = pluginError ? `${pluginError}; ${release}` : release
 		}
+	} else if (!offer && pluginError) {
+		// The fallback was throttled, so the plugin error is all we know.
+		// Reporting "up to date" here would be a lie.
+		message = pluginError
+	}
+
+	if (sameOffer) {
+		patch({ running, checkedAt: Date.now(), pluginError })
+		return
 	}
 
 	patch({
@@ -181,9 +220,10 @@ export async function checkForUpdates(): Promise<void> {
 	})
 }
 
-/// A periodic sweep that only runs when no offer is already waiting: an
-/// installed app left open for days would otherwise never hear about a
-/// release, which is what made "checks on launch" look like "never checks".
+/// A periodic sweep: an installed app left open for days would otherwise
+/// never hear about a release, which is what made "checks on launch" look
+/// like "never checks". It also runs while an offer is waiting, so a
+/// version published after that offer still gets picked up.
 const POLL_MS = 30 * 1000
 const FOCUS_STALE_MS = 10 * 1000
 
@@ -208,13 +248,7 @@ export function startUpdateWatcher(): () => void {
 	if (watcher) return watcher
 	const sweep = (): void => {
 		const { phase } = get(updates)
-		if (
-			phase === "checking" ||
-			phase === "downloading" ||
-			phase === "available"
-		) {
-			return
-		}
+		if (phase === "checking" || phase === "downloading") return
 		void checkForUpdates()
 	}
 	const onFocus = (): void => {

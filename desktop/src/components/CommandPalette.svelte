@@ -13,11 +13,13 @@
 		helpOpen,
 		openPalette,
 		palette,
+		parseQuery,
 		pushToast,
 		refresh,
 		searchQuery,
 		selectedVobe,
 		view,
+		vobeMatchesFilters,
 		vobes,
 	} from "../lib/stores";
 	import type { Vobe } from "../lib/types";
@@ -139,21 +141,29 @@
 		}
 	}
 
+	// The palette honours the same predicates as the dashboard search
+	// (`tag:rust`, `is:dirty`, …), so a saved filter behaves the same
+	// wherever it is typed. Only the free-text part scores the names —
+	// a predicate token like `tag:rust` never appears in a name.
+	$: parsed = parseQuery(query);
+	$: textQuery = parsed.terms.join(" ");
 	$: projectResults = fuzzy(
-		query,
-		$vobes.map((v) => ({
-			id: v.id,
-			text: v.name,
-			meta: [
-				v.path,
-				languageLabel(v.language),
-				frameworkLabel(v.framework),
-				v.git?.branch ?? "",
-			]
-				.filter(Boolean)
-				.join(" · "),
-			data: v,
-		})),
+		textQuery,
+		$vobes
+			.filter((v) => vobeMatchesFilters(v, parsed))
+			.map((v) => ({
+				id: v.id,
+				text: v.name,
+				meta: [
+					v.path,
+					languageLabel(v.language),
+					frameworkLabel(v.framework),
+					v.git?.branch ?? "",
+				]
+					.filter(Boolean)
+					.join(" · "),
+				data: v,
+			})),
 		12,
 	);
 

@@ -260,6 +260,106 @@ fn export_and_import_round_trip() {
 }
 
 #[test]
+fn tag_filter_treats_wildcards_literally() {
+    let store = SqliteStore::open_in_memory().unwrap();
+    let mut a = sample_vobe("axb");
+    a.path = PathBuf::from("/tmp/vobe-wild-a");
+    a.tags.clear();
+    a.add_tag("a%b");
+    store.upsert_vobe(&a).unwrap();
+    let mut b = sample_vobe("other");
+    b.path = PathBuf::from("/tmp/vobe-wild-b");
+    b.tags.clear();
+    b.add_tag("axb");
+    store.upsert_vobe(&b).unwrap();
+
+    let hit = store
+        .list_vobes(
+            &Filter {
+                tag: Some("a%b".into()),
+                ..Filter::default()
+            },
+            Sort::Name,
+        )
+        .unwrap();
+    let names: Vec<_> = hit.iter().map(|v| v.name.as_str()).collect();
+    assert_eq!(
+        names,
+        vec!["axb"],
+        "`%` in a tag must not act as a wildcard"
+    );
+}
+
+#[test]
+fn import_replaces_instead_of_merging() {
+    let dir = std::env::temp_dir().join(format!("vobes-store-replace-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let src = SqliteStore::open_in_memory().unwrap();
+    let mut alpha = sample_vobe("alpha");
+    alpha.path = PathBuf::from("/tmp/vobe-replace-alpha");
+    src.upsert_vobe(&alpha).unwrap();
+    let export_path = dir.join("snap.json");
+    src.export_json(&export_path).unwrap();
+
+    // The destination already holds a vobe the snapshot never had.
+    let dst = SqliteStore::open_in_memory().unwrap();
+    let mut beta = sample_vobe("beta");
+    beta.path = PathBuf::from("/tmp/vobe-replace-beta");
+    dst.upsert_vobe(&beta).unwrap();
+
+    dst.import_json(&export_path).unwrap();
+
+    let vobes = dst.list_vobes(&Filter::all(), Sort::Name).unwrap();
+    let names: Vec<_> = vobes.iter().map(|v| v.name.as_str()).collect();
+    assert_eq!(names, vec!["alpha"], "restore must replace, not merge");
+}
+
+#[test]
+fn failed_import_rolls_back_and_keeps_store_writable() {
+    let dir = std::env::temp_dir().join(format!("vobes-store-rollback-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let src = SqliteStore::open_in_memory().unwrap();
+    let mut alpha = sample_vobe("alpha");
+    alpha.path = PathBuf::from("/tmp/vobe-rollback-alpha");
+    src.upsert_vobe(&alpha).unwrap();
+    src.record_activity(&ActivityEvent::now(alpha.id.clone(), ActivityKind::Created))
+        .unwrap();
+    let export_path = dir.join("snap.json");
+    src.export_json(&export_path).unwrap();
+
+    // Point the activity at a vobe that is not in the snapshot. The
+    // foreign key rejects it mid-transaction.
+    let mut json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&export_path).unwrap()).unwrap();
+    json["activity"][0]["vobe_id"] = serde_json::json!("vobe_missing");
+    std::fs::write(&export_path, serde_json::to_string(&json).unwrap()).unwrap();
+
+    let db = dir.join("vobes.db");
+    {
+        let dst = SqliteStore::open(&db).unwrap();
+        assert!(dst.import_json(&export_path).is_err());
+
+        // A write after the failed import must survive the reopen.
+        let mut beta = sample_vobe("beta");
+        beta.path = PathBuf::from("/tmp/vobe-rollback-beta");
+        dst.upsert_vobe(&beta).unwrap();
+    }
+
+    let reopened = SqliteStore::open(&db).unwrap();
+    let vobes = reopened.list_vobes(&Filter::all(), Sort::Name).unwrap();
+    let names: Vec<_> = vobes.iter().map(|v| v.name.as_str()).collect();
+    assert_eq!(
+        names,
+        vec!["beta"],
+        "a failed import must not swallow later writes"
+    );
+}
+
+#[test]
 fn open_creates_db_file() {
     let dir = std::env::temp_dir().join(format!("vobes-store-file-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);

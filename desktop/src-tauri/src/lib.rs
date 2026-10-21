@@ -100,6 +100,7 @@ pub fn run() {
             commands::scrape_todos,
             commands::context_pack,
             commands::open_path_external,
+            commands::open_url_external,
             commands::list_saved_filters,
             commands::save_saved_filter,
             commands::remove_saved_filter,

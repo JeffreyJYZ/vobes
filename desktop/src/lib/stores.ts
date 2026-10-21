@@ -303,27 +303,34 @@ export const visibleVobes: Readable<Vobe[]> = derived(
 //   is:ahead        vobe.git.ahead > 0
 //   is:unpushed     vobe.git.ahead > 0  (alias)
 //   is:pinned       vobe.pinned
+//   is:attention    dirty, ahead or behind
 //   lang:<x>        vobe.language === <x> (case-insensitive)
 //   fw:<x>          vobe.framework === <x> (case-insensitive)
 //   pm:<x>          vobe.package_manager === <x>
+//   name:<x>        vobe.name contains <x> (case-insensitive)
 // Anything else is a free-text substring across name/path/tags.
 export type ParsedQuery = {
 	tags: string[]
 	predicates: Array<(v: Vobe) => boolean>
-	text: string
+	/// Free-text terms, each matched independently against name/path/tags.
+	terms: string[]
 }
 
 export function parseQuery(q: string): ParsedQuery {
 	const tokens = q.trim().split(/\s+/).filter(Boolean)
 	const tags: string[] = []
 	const predicates: Array<(v: Vobe) => boolean> = []
-	const textParts: string[] = []
+	const terms: string[] = []
 	for (const tok of tokens) {
 		const lower = tok.toLowerCase()
 		let consumed = false
 		if (lower.startsWith("tag:")) {
 			const v = lower.slice(4)
 			if (v) tags.push(v)
+			consumed = true
+		} else if (lower.startsWith("name:")) {
+			const v = lower.slice(5)
+			if (v) predicates.push((x) => x.name.toLowerCase().includes(v))
 			consumed = true
 		} else if (lower.startsWith("lang:")) {
 			const v = lower.slice(5)
@@ -365,29 +372,47 @@ export function parseQuery(q: string): ParsedQuery {
 					predicates.push((x) => x.pinned)
 					consumed = true
 					break
+				case "is:attention":
+					predicates.push(
+						(x) =>
+							x.git?.dirty === true ||
+							(x.git?.ahead ?? 0) > 0 ||
+							(x.git?.behind ?? 0) > 0,
+					)
+					consumed = true
+					break
 				default:
-					// leave as text — fallthrough
+					// leave as free text — fallthrough
 					break
 			}
 		}
-		if (!consumed) textParts.push(lower)
+		if (!consumed) terms.push(lower)
 	}
-	return { tags, predicates, text: textParts.join(" ") }
+	return { tags, predicates, terms }
 }
 
-export function vobeMatches(v: Vobe, p: ParsedQuery): boolean {
+/// Tags and predicates only — no free text. The command palette uses this
+/// to filter by `tag:` / `is:` and leaves the terms to its own fuzzy scorer,
+/// which also looks at the framework and branch.
+export function vobeMatchesFilters(v: Vobe, p: ParsedQuery): boolean {
 	for (const t of p.tags) {
 		if (!v.tags.some((x) => x.toLowerCase() === t)) return false
 	}
 	for (const pred of p.predicates) {
 		if (!pred(v)) return false
 	}
-	if (p.text) {
-		const ql = p.text
+	return true
+}
+
+export function vobeMatches(v: Vobe, p: ParsedQuery): boolean {
+	if (!vobeMatchesFilters(v, p)) return false
+	// Each free-text term must match on its own: "rust web" is two
+	// requirements, not one string that has to appear verbatim.
+	for (const term of p.terms) {
 		if (
-			!v.name.toLowerCase().includes(ql) &&
-			!(v.path ?? "").toLowerCase().includes(ql) &&
-			!v.tags.some((t) => t.toLowerCase().includes(ql))
+			!v.name.toLowerCase().includes(term) &&
+			!(v.path ?? "").toLowerCase().includes(term) &&
+			!v.tags.some((t) => t.toLowerCase().includes(term))
 		) {
 			return false
 		}
