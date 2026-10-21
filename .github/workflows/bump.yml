@@ -10,6 +10,12 @@ permissions:
   # Needed to dispatch release.yml after tagging.
   actions: write
 
+# Two bump runs must not race: both would try to publish the same crate
+# version, and one would fail on "version already exists".
+concurrency:
+  group: bump
+  cancel-in-progress: false
+
 jobs:
   release:
     if: >
@@ -17,10 +23,14 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # A hung publish must not hold a runner for six hours.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 2
+          # Tags are needed: the diff window is the last release tag, so a
+          # crate version bump that was never published is still retried.
+          fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: read commit message + diff versions
@@ -36,21 +46,43 @@ jobs:
           echo "$SUBJECT" | grep -qF '[release]' && MARKER=1 || true
 
           # Desktop version is the tag (per AGENTS.md "tag only when desktop
-          # version changed"). Read from the Rust Cargo.toml — the source of
-          # truth for the binary.
-          NEW_DESKTOP=$(grep -E '^version' desktop/src-tauri/Cargo.toml \
+          # version changed"). Three literals carry it — the Rust manifest,
+          # the npm manifest and the Tauri config — and the updater compares
+          # the one in tauri.conf.json. Read that one and refuse to tag if
+          # the three disagree: a drifted tag publishes an app that never
+          # sees its own update.
+          NEW_DESKTOP=$(grep -E '"version"' desktop/src-tauri/tauri.conf.json \
             | head -1 | sed -E 's/.*"([0-9.]+)".*/\1/')
-          OLD_DESKTOP=$(git show HEAD~1:desktop/src-tauri/Cargo.toml \
-            2>/dev/null | grep -E '^version' | head -1 \
+          CARGO_DESKTOP=$(grep -E '^version' desktop/src-tauri/Cargo.toml \
+            | head -1 | sed -E 's/.*"([0-9.]+)".*/\1/')
+          NPM_DESKTOP=$(grep -E '"version"' desktop/package.json \
+            | head -1 | sed -E 's/.*"([0-9.]+)".*/\1/')
+          if [ "$NEW_DESKTOP" != "$CARGO_DESKTOP" ] || [ "$NEW_DESKTOP" != "$NPM_DESKTOP" ]; then
+            echo "::error::desktop version literals disagree: tauri=$NEW_DESKTOP cargo=$CARGO_DESKTOP npm=$NPM_DESKTOP"
+            exit 1
+          fi
+          OLD_DESKTOP=$(git show HEAD~1:desktop/src-tauri/tauri.conf.json \
+            2>/dev/null | grep -E '"version"' | head -1 \
             | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
 
           # Find every workspace crate whose version moved. Output format:
           #   " name@version name@version ..."
+          #
+          # The window is the last release tag, not HEAD~1: a publish that
+          # failed (or was skipped) was never retried, because the next
+          # commit's diff no longer contained the version bump.
           BUMPED=""
-          for f in $(git diff --name-only HEAD~1 HEAD -- 'crates/*/Cargo.toml'); do
+          BASE=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$BASE" ]; then
+            DIFF_RANGE="$BASE..HEAD"
+          else
+            DIFF_RANGE="HEAD~1..HEAD"
+          fi
+          echo "Diff range: $DIFF_RANGE"
+          for f in $(git diff --name-only $DIFF_RANGE -- 'crates/*/Cargo.toml'); do
             [ -f "$f" ] || continue
             N=$(grep -E '^version' "$f" | head -1 | sed -E 's/.*"([0-9.]+)".*/\1/')
-            O=$(git show HEAD~1:"$f" 2>/dev/null \
+            O=$(git show "$BASE":"$f" 2>/dev/null \
               | grep -E '^version' | head -1 \
               | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
             if [ -n "$O" ] && [ "$N" != "$O" ]; then
@@ -68,34 +100,14 @@ jobs:
           echo "desktop_bumped=$DESKTOP_BUMPED" >> "$GITHUB_OUTPUT"
           echo "bumped_crates=$BUMPED"         >> "$GITHUB_OUTPUT"
 
-      - name: tag release
-        if: >
-          steps.inspect.outputs.desktop_bumped == '1' ||
-          steps.inspect.outputs.marker == '1'
-        env:
-          TAG: v${{ steps.inspect.outputs.desktop_version }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Check the remote, not local — `git rev-parse` only sees
-          # the shallow clone's tags, which never include pre-existing
-          # remote ones. Skip silently if already there; only fail on
-          # a real push problem.
-          if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
-            echo "::notice::Tag $TAG already exists on origin; skipping."
-            exit 0
-          fi
-          git tag "$TAG"
-          git push origin "$TAG"
-          # A tag pushed with GITHUB_TOKEN does NOT trigger other workflows
-          # (GitHub's anti-recursion rule), so release.yml would never run.
-          # Dispatch it explicitly on the tag ref.
-          gh workflow run release.yml --ref "$TAG"
-
       - name: publish bumped crates to crates.io
-        if: contains(steps.inspect.outputs.bumped_crates, '@')
+        # crates.io versions are immutable, so a publish cannot be undone.
+        # Require a deliberate release commit: one that moves a version AND
+        # carries the [release] marker in its subject. A version bump in an
+        # ordinary commit stays local until the user marks it.
+        if: >
+          contains(steps.inspect.outputs.bumped_crates, '@') &&
+          steps.inspect.outputs.desktop_bumped == '1'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
@@ -129,6 +141,8 @@ jobs:
           # Fixed dependency order: cargo refuses to publish a crate whose
           # newly-bumped dependency is not on the registry yet, and the
           # bump list arrives in path order (vobes-cli first).
+          published=""
+          failed=""
           for name in vobes-core vobes-config vobes-git vobes-scan vobes-store vobes-cli vobes-mcp; do
             ver=""
             for spec in ${{ steps.inspect.outputs.bumped_crates }}; do
@@ -141,8 +155,61 @@ jobs:
             fi
             if probe_registry "$name" "$ver"; then
               echo "::notice::$name $ver already on crates.io; skipping."
+              published="$published $name@$ver"
               continue
             fi
             echo "Publishing $name $ver…"
-            cargo publish -p "$name"
+            # The registry index lags a publish by a short while, so a
+            # dependent published immediately after its dependency is
+            # rejected as "no matching package". Retry before giving up.
+            ok=0
+            for attempt in 1 2 3 4 5 6; do
+              if cargo publish -p "$name"; then
+                ok=1
+                break
+              fi
+              echo "::warning::$name $ver publish attempt $attempt failed; waiting for the registry index."
+              sleep 30
+            done
+            if [ "$ok" = "1" ]; then
+              published="$published $name@$ver"
+            else
+              # One failure must not abort the loop: the remaining crates
+              # would never publish and the job would just go red.
+              echo "::error::$name $ver could not be published."
+              failed="$failed $name@$ver"
+            fi
           done
+          echo "Published:$published"
+          if [ -n "$failed" ]; then
+            echo "::error::Failed to publish:$failed"
+            exit 1
+          fi
+
+      - name: tag release
+        if: >
+          steps.inspect.outputs.desktop_bumped == '1' ||
+          steps.inspect.outputs.marker == '1'
+        env:
+          TAG: v${{ steps.inspect.outputs.desktop_version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Check the remote, not local — `git rev-parse` only sees
+          # the shallow clone's tags, which never include pre-existing
+          # remote ones.
+          if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
+            echo "::notice::Tag $TAG already exists on origin; not re-pushing."
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+          # A tag pushed with GITHUB_TOKEN does NOT trigger other workflows
+          # (GitHub's anti-recursion rule), so release.yml would never run.
+          # Dispatch it explicitly on the tag ref. This happens whether or
+          # not the tag already existed: a dropped dispatch was otherwise
+          # unrecoverable, because the tag was already there and every
+          # later run took the "skip" path.
+          gh workflow run release.yml --ref "$TAG"

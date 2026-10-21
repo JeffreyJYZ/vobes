@@ -8,10 +8,88 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+# Read-only by default. The frontend job runs `bun install` and the test
+# suite on pull-request code, so the token must not carry write scope.
+permissions:
+  contents: read
+
+# One CI run per ref. A second push supersedes the first instead of both
+# burning runners on the same commit.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  versions:
+    name: versions (workspace + desktop literals)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: workspace dependency versions match their members
+        run: |
+          set -euo pipefail
+          # The root [workspace.dependencies] version is what lands in a
+          # published manifest. A member bumped without the root table
+          # publishes a crate that depends on the OLD sibling version —
+          # and crates.io versions are immutable, so it cannot be fixed.
+          fail=0
+          for manifest in crates/*/Cargo.toml; do
+            name=$(sed -nE 's/^name = "(.*)"/\1/p' "$manifest" | head -1)
+            member=$(sed -nE 's/^version = "(.*)"/\1/p' "$manifest" | head -1)
+            root=$(sed -nE "s/^$name = .*version = \"(.*)\".*/\1/p" Cargo.toml | head -1)
+            if [ -z "$root" ]; then
+              echo "::notice::$name has no root entry (not depended on)"
+              continue
+            fi
+            if [ "$member" != "$root" ]; then
+              echo "::error::$name: member is $member but Cargo.toml says $root"
+              fail=1
+            else
+              echo "ok $name $member"
+            fi
+          done
+          exit $fail
+
+      - name: desktop version literals agree
+        run: |
+          set -euo pipefail
+          # Three places carry the desktop version: the Rust manifest, the
+          # npm manifest and the Tauri config. The release tag comes from
+          # one and the updater compares another, so a drift publishes an
+          # app that never sees its own update.
+          cargo_version=$(sed -nE 's/^version = "(.*)"/\1/p' desktop/src-tauri/Cargo.toml | head -1)
+          npm_version=$(sed -nE 's/^[[:space:]]*"version": "(.*)",/\1/p' desktop/package.json | head -1)
+          tauri_version=$(sed -nE 's/^[[:space:]]*"version": "(.*)",/\1/p' desktop/src-tauri/tauri.conf.json | head -1)
+          echo "cargo=$cargo_version npm=$npm_version tauri=$tauri_version"
+          if [ "$cargo_version" != "$npm_version" ] || [ "$cargo_version" != "$tauri_version" ]; then
+            echo "::error::desktop version literals disagree"
+            exit 1
+          fi
+
+      - name: updater pubkey matches the committed public key
+        run: |
+          set -euo pipefail
+          # The pubkey pinned in tauri.conf.json and the key that signs
+          # the release artifacts are independent copies. A mismatch means
+          # the updater rejects every signed build — the app silently
+          # never updates. The public key is not a secret, so it lives in
+          # the repo and the two are compared here.
+          pinned=$(grep -o '"pubkey": "[^"]*"' desktop/src-tauri/tauri.conf.json | cut -d'"' -f4)
+          committed=$(tr -d ' \t\r\n' < desktop/src-tauri/vobes-updater.pub)
+          if [ "$pinned" != "$committed" ]; then
+            echo "::error::tauri.conf.json pubkey does not match vobes-updater.pub"
+            echo "pinned:    $pinned"
+            echo "committed: $committed"
+            exit 1
+          fi
+          echo "updater pubkey matches the committed public key"
+
   core:
     name: core (fmt + clippy + test)
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -43,6 +121,7 @@ jobs:
   frontend:
     name: frontend (lint + typecheck + test)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
@@ -69,6 +148,7 @@ jobs:
   desktop:
     name: desktop (tauri build)
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:

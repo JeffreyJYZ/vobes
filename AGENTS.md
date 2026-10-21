@@ -80,8 +80,13 @@ Always run relevant checks before claiming task done.
   builds are rejected by every installed copy.
 - **Never regenerate that keypair once a signed release is public** — installed
   copies pin the pubkey, so a new key strands them.
+- The public key is committed at `desktop/src-tauri/vobes-updater.pub`; CI
+  asserts it matches the `pubkey` pinned in `tauri.conf.json`. A mismatch means
+  the updater rejects every signed build.
 - `bump.yml` publishes bumped crates and skips versions already on the
   registry; `release.yml` signs and uploads `latest.json` + `.sig` artifacts.
+  Crates publish **before** the tag is cut, so the release notes never
+  advertise a version that is not on crates.io yet.
 - Secret `CARGO_REGISTRY_TOKEN` is required by `bump.yml`.
 
 ## Release flow
@@ -96,13 +101,20 @@ To bump a crate:
 1. Edit its `version =` line in own `Cargo.toml`.
 2. If another workspace crate depends on it via `workspace = true`, also bump
    matching `version =` line in root `[workspace.dependencies]` table so
-   `cargo publish` resolves.
-3. Tag `vX.Y.Z` only when **desktop** version changed. Crates.io-only bumps need
+   `cargo publish` resolves. CI fails the build on a mismatch — a member
+   bumped without the root table publishes a crate pinned to the OLD sibling
+   version, and crates.io versions are immutable.
+3. Bump the desktop version in **all three** places: `desktop/src-tauri/Cargo.toml`,
+   `desktop/package.json`, `desktop/src-tauri/tauri.conf.json`. The tag comes
+   from `tauri.conf.json` (the updater compares that one) and CI asserts all
+   three agree.
+4. Tag `vX.Y.Z` only when **desktop** version changed. Crates.io-only bumps need
    no tag — `cargo publish -p <name>` enough.
 
 `.github/workflows/release.yml` creates **draft** GitHub release named
 `Vobes vX.Y.Z Pre-alpha` — user publishes manually. `quality` job
-(`fmt + clippy + test`, `--exclude vobes-desktop`) gates release build.
+(`fmt + clippy + test`, `--exclude vobes-desktop`, plus the desktop clippy and
+the frontend lint/typecheck/test) gates the release build.
 
 - **A tag pushed by `GITHUB_TOKEN` never triggers another workflow** (GitHub's
   anti-recursion rule), so `bump.yml` must `gh workflow run release.yml --ref
@@ -110,6 +122,12 @@ To bump a crate:
   (cost v0.1.10). Pushing the tag by hand from a laptop *does* trigger it.
 - `bump.yml` publishes bumped crates and skips versions already on the
   registry; needs secret `CARGO_REGISTRY_TOKEN`.
+- The publish runs **before** the tag, so the release notes never advertise a
+  crate version that is not on crates.io yet.
+- A crate publish that fails does not stop the others: each crate is isolated
+  and the failures are listed at the end.
+- A crate version bump is only published when the desktop version moved too —
+  crates.io versions are immutable, so a publish cannot be undone.
 
 ## Schema migrations
 
