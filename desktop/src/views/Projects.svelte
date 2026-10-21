@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount, tick } from "svelte";
 	import * as actions from "../lib/actions";
 	import * as api from "../lib/api";
 	import Select from "../components/Select.svelte";
@@ -27,6 +27,10 @@
 	let detailActivity: ActivityEvent[] = [];
 	let notesDraft = "";
 	let savingNotes = false;
+	let renaming = false;
+	let nameDraft = "";
+	let savingName = false;
+	let nameInput: HTMLInputElement | null = null;
 	let busy = false;
 	let readmeText: string | null = null;
 	let readmeLoaded = false;
@@ -227,6 +231,42 @@
 		}
 	}
 
+	function startRename() {
+		if (!selected) return;
+		nameDraft = selected.name;
+		renaming = true;
+		void tick().then(() => {
+			nameInput?.focus();
+			nameInput?.select();
+		});
+	}
+
+	function cancelRename() {
+		renaming = false;
+		nameDraft = "";
+	}
+
+	async function saveName() {
+		if (!selected) return;
+		const next = nameDraft.trim();
+		if (!next || next === selected.name) {
+			cancelRename();
+			return;
+		}
+		savingName = true;
+		try {
+			const fresh = await api.saveName(selected.name, next);
+			selectedVobe.set(fresh);
+			renaming = false;
+			nameDraft = "";
+			pushToast({ kind: "success", message: `Renamed to ${fresh.name}.` });
+		} catch (e) {
+			pushToast({ kind: "error", message: errorString(e) });
+		} finally {
+			savingName = false;
+		}
+	}
+
 	async function saveNotes() {
 		if (!selected) return;
 		savingNotes = true;
@@ -374,7 +414,28 @@
 	{:else}
 		<div class="head">
 			<button class="back" on:click={back}>← Dashboard</button>
-			<h2>{selected.name}</h2>
+			{#if renaming}
+				<form class="rename" on:submit|preventDefault={saveName}>
+					<input
+						bind:this={nameInput}
+						bind:value={nameDraft}
+						aria-label="New name"
+						spellcheck="false"
+						on:keydown={(e) => e.key === "Escape" && cancelRename()}
+					/>
+					<button type="submit" class="primary" disabled={savingName}>
+						{savingName ? "Saving…" : "Save"}
+					</button>
+					<button type="button" on:click={cancelRename} disabled={savingName}>
+						Cancel
+					</button>
+				</form>
+			{:else}
+				<h2>{selected.name}</h2>
+				<button class="rename-btn" on:click={startRename} disabled={busy}>
+					Rename
+				</button>
+			{/if}
 			<div class="row">
 				<button on:click={() => togglePin(selected)} disabled={busy}>
 					{selected.pinned ? "Unpin" : "Pin"}
@@ -681,6 +742,39 @@
 		margin: 0;
 		flex: 1;
 		min-width: 160px;
+	}
+	.rename-btn {
+		background: transparent;
+		border: none;
+		color: var(--fg-faint);
+		cursor: pointer;
+		padding: 4px 6px;
+		font: inherit;
+		font-size: 12.5px;
+	}
+	.rename-btn:hover {
+		color: var(--fg);
+		background: transparent;
+	}
+	.rename {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex: 1;
+		min-width: 240px;
+	}
+	.rename input {
+		flex: 1;
+		min-width: 120px;
+		font: inherit;
+		font-size: 15px;
+		font-weight: 650;
+		padding: 6px 10px;
+		color: var(--fg);
+		background: var(--bg-elevated);
+		border: 1px solid var(--accent);
+		border-radius: var(--radius-sm);
+		outline: none;
 	}
 	.row {
 		display: flex;

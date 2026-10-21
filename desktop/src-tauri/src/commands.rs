@@ -112,6 +112,7 @@ pub async fn sync(state: State<'_, Arc<DesktopCtx>>) -> Result<(usize, usize)> {
             if let Some(prev) = existing {
                 vobe.id = prev.id;
                 vobe.created_at = prev.created_at;
+                vobe.name = prev.name;
                 vobe.tags = prev.tags;
                 vobe.notes = prev.notes;
                 vobe.pinned = prev.pinned;
@@ -292,6 +293,20 @@ pub async fn reveal_in_finder(state: State<'_, Arc<DesktopCtx>>, name: String) -
     };
     crate::platform::reveal(&vobe.path)?;
     Ok(())
+}
+
+/// Rename a vobe. Returns the refreshed vobe.
+#[tauri::command]
+pub async fn save_name(
+    state: State<'_, Arc<DesktopCtx>>,
+    name: String,
+    new_name: String,
+) -> Result<VobeDto> {
+    let Some(vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
+        return Err(vobes_core::Error::not_found(name));
+    };
+    let renamed = state.store.rename_vobe(&vobe.id, &new_name)?;
+    Ok(VobeDto::from(&renamed))
 }
 
 /// Update a vobe's `notes` field. Returns the refreshed vobe.

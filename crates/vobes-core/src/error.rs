@@ -106,6 +106,10 @@ pub enum Error {
     /// Generic internal error.
     #[error("internal error: {0}")]
     Internal(String),
+
+    /// Caller supplied a value the operation can't accept.
+    #[error("invalid argument: {0}")]
+    Invalid(String),
 }
 
 impl Error {
@@ -137,6 +141,11 @@ impl Error {
     /// Build an internal error from any string-like source.
     pub fn internal(msg: impl Into<String>) -> Self {
         Self::Internal(msg.into())
+    }
+
+    /// Build an invalid-argument error from any string-like source.
+    pub fn invalid(msg: impl Into<String>) -> Self {
+        Self::Invalid(msg.into())
     }
 }
 

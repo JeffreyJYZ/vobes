@@ -23,6 +23,7 @@ pub fn run(app: &App) -> Result<()> {
                 // Preserve identity + user fields from the existing vobe.
                 vobe.id = prev.id;
                 vobe.created_at = prev.created_at;
+                vobe.name = prev.name;
                 vobe.tags = prev.tags;
                 vobe.notes = prev.notes;
                 vobe.pinned = prev.pinned;

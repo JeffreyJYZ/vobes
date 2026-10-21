@@ -263,6 +263,7 @@ Both faces talk to the same core. Capabilities should match; gaps are bugs.
 | Activity per vobe | `show` (embedded) | Projects activity card | — |
 | Add vobe | `add <path>` | "Add vobe…" | — |
 | Remove vobe | `rm <name>` | "Remove" in Projects view | — |
+| Rename vobe | `rename <name> <new>` | "Rename" in Projects view | names are unique; `sync` keeps a custom name |
 | Open in editor | `open <name>` | "Open in editor" | desktop uses shell plugin |
 | Export JSON snapshot | `export` | Settings → Snapshots → Export now | both write `snapshots_dir/vobes-<ts>.json` |
 | Restore snapshot | `import` (planned) | Settings → Snapshots → Restore | CLI import pending — see `Store::import_json` |

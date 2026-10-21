@@ -71,6 +71,13 @@ pub enum Command {
         /// Vobe name.
         name: String,
     },
+    /// Rename a vobe. The name is the handle CLI/MCP look it up by.
+    Rename {
+        /// Current vobe name or path.
+        name: String,
+        /// New name.
+        new_name: String,
+    },
     /// Record an Opened event and launch editor.
     Open {
         /// Vobe name.
@@ -131,6 +138,7 @@ fn dispatch(app: &vobes_cli::app::App, cmd: Command) -> vobes_core::Result<()> {
         Command::Sync => commands::sync::run(app),
         Command::Add { path } => commands::add::run(app, &path),
         Command::Rm { name } => commands::rm::run(app, &name),
+        Command::Rename { name, new_name } => commands::rename::run(app, &name, &new_name),
         Command::Open { name } => commands::open::run(app, &name),
         Command::Reset { yes } => commands::reset::run(app, yes),
         Command::Export { out } => commands::export::run(app, out.as_deref()),

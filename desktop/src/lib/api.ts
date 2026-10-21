@@ -95,6 +95,13 @@ export async function revealInFinder(name: string): Promise<void> {
 	return invoke<void>("reveal_in_finder", { name })
 }
 
+export async function saveName(
+	name: string,
+	newName: string,
+): Promise<Vobe> {
+	return invoke<Vobe>("save_name", { name, newName })
+}
+
 export async function saveNotes(
 	name: string,
 	notes: string | null,

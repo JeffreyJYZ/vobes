@@ -26,6 +26,29 @@ pub trait Store: Send + Sync {
     fn get_vobe_by_name(&self, name: &str) -> Result<Option<Vobe>>;
     /// Fetch a single vobe by path.
     fn get_vobe_by_path(&self, path: &Path) -> Result<Option<Vobe>>;
+    /// Rename a vobe, rejecting an empty name or one another vobe
+    /// already uses. The name is the handle every surface resolves
+    /// against, so duplicates have to stay out.
+    fn rename_vobe(&self, id: &VobeId, new_name: &str) -> Result<Vobe> {
+        let name = new_name.trim();
+        if name.is_empty() {
+            return Err(vobes_core::Error::invalid("a vobe name can't be empty"));
+        }
+        if let Some(other) = self.get_vobe_by_name(name)? {
+            if other.id != *id {
+                return Err(vobes_core::Error::invalid(format!(
+                    "a vobe named `{name}` already exists ({})",
+                    other.path.display()
+                )));
+            }
+        }
+        let Some(mut vobe) = self.get_vobe(id)? else {
+            return Err(vobes_core::Error::not_found(id.to_string()));
+        };
+        vobe.name = name.to_string();
+        self.upsert_vobe(&vobe)?;
+        Ok(vobe)
+    }
     /// List vobes matching the filter, sorted.
     fn list_vobes(&self, filter: &Filter, sort: Sort) -> Result<Vec<Vobe>>;
     /// Delete a vobe (cascades to activity).

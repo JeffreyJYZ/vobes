@@ -91,6 +91,7 @@ pub fn run() {
             commands::open_in_terminal,
             commands::reveal_in_finder,
             commands::save_notes,
+            commands::save_name,
             commands::set_pinned,
             commands::set_tags,
             commands::read_readme,
