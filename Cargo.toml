@@ -79,12 +79,12 @@ notify = "6"
 notify-debouncer-mini = "0.4"
 
 # Internal crates
-vobes-core = { path = "crates/vobes-core", version = "0.1.6" }
+vobes-core = { path = "crates/vobes-core", version = "0.1.7" }
 vobes-scan = { path = "crates/vobes-scan", version = "0.1.6" }
 vobes-git = { path = "crates/vobes-git", version = "0.1.6" }
-vobes-store = { path = "crates/vobes-store", version = "0.1.6" }
+vobes-store = { path = "crates/vobes-store", version = "0.1.7" }
 vobes-config = { path = "crates/vobes-config", version = "0.1.6" }
-vobes-cli = { path = "crates/vobes-cli", version = "0.1.6" }
+vobes-cli = { path = "crates/vobes-cli", version = "0.1.7" }
 
 [profile.release]
 opt-level = 3

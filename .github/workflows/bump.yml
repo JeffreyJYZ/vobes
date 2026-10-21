@@ -114,10 +114,19 @@ jobs:
             exit 1
           fi
           echo "Bumped:${{ steps.inspect.outputs.bumped_crates }}"
-          for spec in ${{ steps.inspect.outputs.bumped_crates }}; do
-            name=${spec%@*}
-            ver=${spec#*@}
-            [ "$name" = "vobes-desktop" ] && continue
+          # Fixed dependency order: cargo refuses to publish a crate whose
+          # newly-bumped dependency is not on the registry yet, and the
+          # bump list arrives in path order (vobes-cli first).
+          for name in vobes-core vobes-config vobes-git vobes-scan vobes-store vobes-cli vobes-mcp; do
+            ver=""
+            for spec in ${{ steps.inspect.outputs.bumped_crates }}; do
+              if [ "${spec%@*}" = "$name" ]; then
+                ver=${spec#*@}
+              fi
+            done
+            if [ -z "$ver" ]; then
+              continue
+            fi
             if cargo info "$name@$ver" >/dev/null 2>&1; then
               echo "::notice::$name $ver already on crates.io; skipping."
               continue

@@ -5724,7 +5724,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vobes-cli"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "chrono",
  "clap",
@@ -5754,7 +5754,7 @@ dependencies = [
 
 [[package]]
 name = "vobes-core"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "chrono",
  "serde",
@@ -5764,7 +5764,7 @@ dependencies = [
 
 [[package]]
 name = "vobes-desktop"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "chrono",
  "notify",
@@ -5824,7 +5824,7 @@ dependencies = [
 
 [[package]]
 name = "vobes-store"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "chrono",
  "rusqlite",
