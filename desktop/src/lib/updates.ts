@@ -42,6 +42,11 @@ export interface UpdateState {
 	offer: UpdateOffer | null
 	percent: number | null
 	message: string | null
+	/// When the last check settled, for the "checked 5 minutes ago" line.
+	checkedAt: number | null
+	/// Why the Tauri updater path found nothing, kept apart from `message`
+	/// so a working GitHub fallback does not hide a broken plugin.
+	pluginError: string | null
 }
 
 const initial: UpdateState = {
@@ -50,6 +55,8 @@ const initial: UpdateState = {
 	offer: null,
 	percent: null,
 	message: null,
+	checkedAt: null,
+	pluginError: null,
 }
 
 export const updates = writable<UpdateState>(initial)
@@ -95,11 +102,11 @@ export function dismissedVersion(): string | null {
 /// Back to `idle`, handing the Rust-side handle back first — a closed handle
 /// cannot be installed from later, so the next check gets a fresh one.
 export function discardOffer(): void {
-	const { offer } = get(updates)
+	const { offer, running, checkedAt, pluginError } = get(updates)
 	if (offer?.kind === "updater") {
 		void offer.update.close().catch(() => {})
 	}
-	updates.set({ ...initial, running: get(updates).running })
+	updates.set({ ...initial, running, checkedAt, pluginError })
 }
 
 export function dismissOffer(): void {
@@ -119,7 +126,13 @@ export async function checkForUpdates(): Promise<void> {
 	if (previous?.kind === "updater") {
 		void previous.update.close().catch(() => {})
 	}
-	patch({ phase: "checking", offer: null, percent: null, message: null })
+	patch({
+		phase: "checking",
+		offer: null,
+		percent: null,
+		message: null,
+		pluginError: null,
+	})
 
 	let running: string | null = null
 	try {
@@ -129,14 +142,17 @@ export async function checkForUpdates(): Promise<void> {
 	}
 
 	let offer: UpdateOffer | null = null
+	let pluginError: string | null = null
 	try {
 		const found = await check()
 		if (found) {
 			offer = { kind: "updater", version: found.version, update: found }
 		}
-	} catch {
+	} catch (e) {
 		// Plugin absent, offline, or no artifact for this platform — the
-		// GitHub path below still answers "is there a newer version".
+		// GitHub path below still answers "is there a newer version", but
+		// the reason stays visible in Settings.
+		pluginError = e instanceof Error ? e.message : String(e)
 	}
 
 	let message: string | null = null
@@ -147,7 +163,8 @@ export async function checkForUpdates(): Promise<void> {
 				offer = { kind: "github", version: newest }
 			}
 		} catch (e) {
-			message = e instanceof Error ? e.message : String(e)
+			const release = e instanceof Error ? e.message : String(e)
+			message = pluginError ? `${pluginError}; ${release}` : release
 		}
 	}
 
@@ -157,7 +174,49 @@ export async function checkForUpdates(): Promise<void> {
 		offer,
 		percent: null,
 		message: offer ? null : message,
+		checkedAt: Date.now(),
+		pluginError,
 	})
+}
+
+/// A periodic sweep that only runs when no offer is already waiting: an
+/// installed app left open for days would otherwise never hear about a
+/// release, which is what made "checks on launch" look like "never checks".
+const POLL_MS = 30 * 60 * 1000
+const STALE_MS = 15 * 60 * 1000
+
+let watcher: (() => void) | null = null
+
+/// Check now, then every half hour, and on focus when the last check is
+/// older than the short interval. Idempotent — mounting twice keeps one timer.
+export function startUpdateWatcher(): () => void {
+	if (watcher) return watcher
+	const sweep = (): void => {
+		const { phase } = get(updates)
+		if (
+			phase === "checking" ||
+			phase === "downloading" ||
+			phase === "available"
+		) {
+			return
+		}
+		void checkForUpdates()
+	}
+	const onFocus = (): void => {
+		const { checkedAt } = get(updates)
+		if (checkedAt !== null && Date.now() - checkedAt < STALE_MS) return
+		sweep()
+	}
+	void checkForUpdates()
+	const timer = setInterval(sweep, POLL_MS)
+	window.addEventListener("focus", onFocus)
+	const stop = (): void => {
+		clearInterval(timer)
+		window.removeEventListener("focus", onFocus)
+		watcher = null
+	}
+	watcher = stop
+	return stop
 }
 
 /// Download and install the offered update, reporting 0-100 progress (`null`

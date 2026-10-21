@@ -1,19 +1,18 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import {
-		checkForUpdates,
 		dismissedVersion,
 		dismissOffer,
 		installNow,
 		LATEST_RELEASE_URL,
+		startUpdateWatcher,
 		updates,
 	} from "../lib/updates";
 
-	// Silent by design: offline, rate-limited or plugin-less builds just
-	// stay quiet, and the app is unaffected.
-	onMount(() => {
-		void checkForUpdates();
-	});
+	// Checks on mount, then periodically and on focus, so a window left open
+	// still learns about a release. Silent by design: offline, rate-limited or
+	// plugin-less builds just stay quiet, and the app is unaffected.
+	onMount(() => startUpdateWatcher());
 
 	$: offer = $updates.offer;
 	$: visible =

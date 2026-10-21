@@ -9,6 +9,7 @@
 		listSnapshots,
 		restoreSnapshot,
 	} from "../lib/api";
+	import { relativeTime } from "../lib/format";
 	import {
 		applyConfig,
 		config,
@@ -36,6 +37,10 @@
 
 	let snapshots: SnapshotInfo[] = [];
 	let snapshotBusy = false;
+
+	$: checkedLabel = $updates.checkedAt
+		? relativeTime(new Date($updates.checkedAt).toISOString())
+		: null;
 
 	onMount(async () => {
 		if (!$config) await loadConfig();
@@ -297,8 +302,9 @@ async function restore(s: SnapshotInfo) {
 		<section class="block">
 			<h3>Updates</h3>
 			<p class="muted small">
-				Vobes checks for a newer release on launch and verifies its
-				signature before installing.
+				Vobes checks on launch, every 30 minutes, and when the window
+				regains focus. A downloaded update is verified against the
+				pinned signature before it installs.
 			</p>
 			<div class="row gap updater-row">
 				<span class="mono small">
@@ -315,6 +321,9 @@ async function restore(s: SnapshotInfo) {
 							: ` ${$updates.percent}%`}
 					{:else if $updates.phase === "failed"}
 						· {$updates.message ?? "check failed"}
+					{/if}
+					{#if checkedLabel}
+						<span class="muted"> · checked {checkedLabel}</span>
 					{/if}
 				</span>
 				{#if $updates.phase === "available" && $updates.offer?.kind === "updater"}
@@ -338,6 +347,11 @@ async function restore(s: SnapshotInfo) {
 					</button>
 				{/if}
 			</div>
+			{#if $updates.pluginError && $updates.phase !== "available"}
+				<p class="muted small mono">
+					Built-in updater unavailable: {$updates.pluginError}
+				</p>
+			{/if}
 		</section>
 
 		<section class="block">
