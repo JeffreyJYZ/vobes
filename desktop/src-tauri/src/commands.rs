@@ -162,6 +162,84 @@ pub async fn remove_vobe(state: State<'_, Arc<DesktopCtx>>, name: String) -> Res
     Ok(())
 }
 
+/// Delete a project's directory from disk and stop tracking it.
+#[tauri::command]
+pub async fn delete_project_dir(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result<()> {
+    let Some(vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
+        return Err(vobes_core::Error::not_found(name));
+    };
+    let target = deletable_project_path(&vobe.path)?;
+    std::fs::remove_dir_all(&target)
+        .map_err(|e| vobes_core::Error::internal(format!("delete {}: {e}", target.display())))?;
+    state.store.delete_vobe(&vobe.id)?;
+    Ok(())
+}
+
+/// Delete a project's `.git` entry. The working tree is left alone and
+/// the vobe stays tracked, now without git info.
+#[tauri::command]
+pub async fn delete_git_dir(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result<VobeDto> {
+    let Some(mut vobe) = lookup_vobe(state.store.as_ref(), &name)? else {
+        return Err(vobes_core::Error::not_found(name));
+    };
+    let git = vobe.path.join(".git");
+    if !git.exists() {
+        return Err(vobes_core::Error::invalid(format!(
+            "{} has no .git",
+            vobe.path.display()
+        )));
+    }
+    let removed = if git.is_dir() {
+        std::fs::remove_dir_all(&git)
+    } else {
+        std::fs::remove_file(&git)
+    };
+    removed.map_err(|e| vobes_core::Error::internal(format!("delete {}: {e}", git.display())))?;
+    vobe.git = None;
+    state.store.upsert_vobe(&vobe)?;
+    Ok(VobeDto::from(&vobe))
+}
+
+/// Refuse paths whose deletion would take out more than one project:
+/// the filesystem root, the home directory, the app's own state dir,
+/// or anything shallower than a home-directory child.
+fn deletable_project_path(path: &Path) -> Result<PathBuf> {
+    let target = path
+        .canonicalize()
+        .map_err(|e| vobes_core::Error::not_found(format!("{}: {e}", path.display())))?;
+    if !target.is_dir() {
+        return Err(vobes_core::Error::invalid(format!(
+            "{} is not a directory",
+            target.display()
+        )));
+    }
+    let home = std::env::var("HOME")
+        .ok()
+        .and_then(|h| PathBuf::from(h).canonicalize().ok());
+    if let Some(home) = &home {
+        if target == *home || home.starts_with(&target) {
+            return Err(vobes_core::Error::invalid(format!(
+                "refusing to delete {}",
+                target.display()
+            )));
+        }
+    }
+    if let Some(state_dir) = vobes_config::state_dir() {
+        if let Ok(state_dir) = state_dir.canonicalize() {
+            if target == state_dir || state_dir.starts_with(&target) {
+                return Err(vobes_core::Error::invalid(format!(
+                    "refusing to delete {}",
+                    target.display()
+                )));
+            }
+        }
+    }
+    if target.parent().is_none() {
+        return Err(vobes_core::Error::invalid("refusing to delete the root"));
+    }
+    Ok(target)
+}
+
 /// Mark opened + record activity (editor launch handled by frontend via shell plugin).
 #[tauri::command]
 pub async fn open_vobe(state: State<'_, Arc<DesktopCtx>>, name: String) -> Result<()> {

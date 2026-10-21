@@ -93,6 +93,47 @@ export async function removeVobe(v: Vobe) {
 	}
 }
 
+/// Delete the project directory from disk, then stop tracking it.
+/// Two confirmations: this is a recursive delete with no Trash and no
+/// undo, and the path is what's being destroyed.
+export async function deleteProjectFromDisk(v: Vobe) {
+	const ok = await ask(
+		`Delete ${v.path} from disk? Every file in that directory is removed. This cannot be undone.`,
+		{ title: "Delete project", kind: "warning" },
+	)
+	if (!ok) return
+	const sure = await ask(
+		`Last check: permanently delete ${v.name}? There is no Trash and no undo.`,
+		{ title: "Delete project", kind: "warning" },
+	)
+	if (!sure) return
+	try {
+		await api.deleteProjectDir(v.name)
+		if (get(selectedVobe)?.id === v.id) selectedVobe.set(null)
+		await refresh({ silent: true })
+		pushToast({ kind: "success", message: `Deleted ${v.path}.` })
+	} catch (e) {
+		pushToast({ kind: "error", message: errorString(e) })
+	}
+}
+
+/// Delete a project's `.git` directory. Files stay, history does not.
+export async function deleteGitDir(v: Vobe) {
+	const ok = await ask(
+		`Delete ${v.path}/.git? The commit history is gone; the working files stay. This cannot be undone.`,
+		{ title: "Delete .git", kind: "warning" },
+	)
+	if (!ok) return
+	try {
+		const fresh = await api.deleteGitDir(v.name)
+		if (get(selectedVobe)?.id === v.id) selectedVobe.set(fresh)
+		await refresh({ silent: true })
+		pushToast({ kind: "success", message: "Removed .git." })
+	} catch (e) {
+		pushToast({ kind: "error", message: errorString(e) })
+	}
+}
+
 /// Untrack a vobe whose tracked path is gone. No confirm: the files are
 /// already gone, so this only drops a dead row.
 export async function untrackMissing(v: Vobe) {

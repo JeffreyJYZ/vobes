@@ -750,16 +750,45 @@ onDestroy(() => {
 
 			<section class="card span2 danger-zone">
 				<h3>Danger zone</h3>
-				<button
-					class="danger"
-					on:click={() => removeVobe(selected)}
-					disabled={busy}
-				>
-					Untrack this project
-				</button>
-				<div class="muted small">
-					Vobes forgets this project but does not touch the files on
-					disk.
+				<div class="danger-row">
+					<button
+						class="danger"
+						on:click={() => removeVobe(selected)}
+						disabled={busy}
+					>
+						Untrack this project
+					</button>
+					<p class="muted small">
+						Vobes forgets this project. The files on disk stay
+						where they are.
+					</p>
+				</div>
+				<div class="danger-row">
+					<button
+						class="danger"
+						on:click={() => actions.deleteGitDir(selected)}
+						disabled={busy || !selected.git}
+					>
+						Delete .git
+					</button>
+					<p class="muted small">
+						Removes <code>.git</code> from the project, dropping
+						its history. The working files stay and the project
+						keeps being tracked, without git.
+					</p>
+				</div>
+				<div class="danger-row">
+					<button
+						class="danger"
+						on:click={() => actions.deleteProjectFromDisk(selected)}
+						disabled={busy}
+					>
+						Delete this directory
+					</button>
+					<p class="muted small">
+						Deletes <code>{selected.path}</code> and everything in
+						it, then untracks the project. No Trash, no undo.
+					</p>
 				</div>
 			</section>
 		</div>
@@ -1282,6 +1311,26 @@ onDestroy(() => {
 	}
 	.danger-zone h3 {
 		color: var(--danger);
+		margin-bottom: 16px;
+	}
+	.danger-zone {
+		display: grid;
+		gap: 18px;
+	}
+	.danger-row {
+		display: grid;
+		gap: 8px;
+		justify-items: start;
+	}
+	.danger-row p {
+		margin: 0;
+		line-height: 1.5;
+		max-width: 58ch;
+	}
+	.danger-row code {
+		font-family: ui-monospace, Menlo, monospace;
+		font-size: 11.5px;
+		color: var(--fg);
 	}
 	.danger {
 		background: transparent;

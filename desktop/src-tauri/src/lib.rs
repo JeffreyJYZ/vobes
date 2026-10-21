@@ -84,6 +84,8 @@ pub fn run() {
             commands::factory_reset,
             commands::add_vobe,
             commands::remove_vobe,
+            commands::delete_project_dir,
+            commands::delete_git_dir,
             commands::open_vobe,
             commands::export_json,
             commands::get_config,

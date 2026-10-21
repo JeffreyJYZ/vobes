@@ -117,6 +117,14 @@ export async function setTags(name: string, tags: string[]): Promise<Vobe> {
 	return invoke<Vobe>("set_tags", { name, tags })
 }
 
+export async function deleteGitDir(name: string): Promise<Vobe> {
+	return invoke<Vobe>("delete_git_dir", { name })
+}
+
+export async function deleteProjectDir(name: string): Promise<void> {
+	return invoke<void>("delete_project_dir", { name })
+}
+
 export async function readReadme(name: string): Promise<string | null> {
 	return invoke<string | null>("read_readme", { name })
 }
