@@ -98,9 +98,42 @@ jobs:
           fi
           echo "tag $GITHUB_REF_NAME is on main"
 
+  # Create the draft release exactly once, before the matrix.
+  #
+  # tauri-action creates a release when it cannot find one for the tag, so
+  # four concurrent matrix jobs each created their own draft and the
+  # assets split across them (v0.1.14 shipped as two half-populated
+  # drafts). With the draft already in place every job updates the same
+  # release instead.
+  prepare:
+    name: create draft release
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: create the draft release if it is missing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::a release for $TAG already exists; reusing it"
+            exit 0
+          fi
+          gh release create "$TAG" --draft \
+            --title "Vobes $TAG Pre-alpha" \
+            --notes "Vobes $TAG — Pre-alpha.
+
+          Desktop app (unsigned): expect Gatekeeper / SmartScreen warnings on first run.
+          macOS desktop bundle is universal (arm64 + x64).
+          Linux desktop: x64 and arm64 (deb + appimage).
+          CLI: \`cargo install vobes-cli\` (or \`cargo install vobes-mcp\` for the agent server)."
+
   release:
     name: release (${{ matrix.platform }})
-    needs: quality
+    needs: [quality, prepare]
     timeout-minutes: 60
     strategy:
       fail-fast: false
