@@ -61,23 +61,26 @@ jobs:
             echo "::error::desktop version literals disagree: tauri=$NEW_DESKTOP cargo=$CARGO_DESKTOP npm=$NPM_DESKTOP"
             exit 1
           fi
-          OLD_DESKTOP=$(git show HEAD~1:desktop/src-tauri/tauri.conf.json \
-            2>/dev/null | grep -E '"version"' | head -1 \
-            | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
-
-          # Find every workspace crate whose version moved. Output format:
-          #   " name@version name@version ..."
-          #
-          # The window is the last release tag, not HEAD~1: a publish that
-          # failed (or was skipped) was never retried, because the next
-          # commit's diff no longer contained the version bump.
-          BUMPED=""
+          # The window is the last release tag, not HEAD~1: a version bump
+          # that lands in one commit and something else in the next would
+          # otherwise be invisible, and a publish that failed (or was
+          # skipped) was never retried because the next diff no longer
+          # contained the bump. This applied to the desktop version too —
+          # v0.1.14 was bumped one commit and shipped the next, so the tag
+          # never got cut.
           BASE=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -n "$BASE" ]; then
             DIFF_RANGE="$BASE..HEAD"
           else
             DIFF_RANGE="HEAD~1..HEAD"
           fi
+          OLD_DESKTOP=$(git show "$BASE":desktop/src-tauri/tauri.conf.json \
+            2>/dev/null | grep -E '"version"' | head -1 \
+            | sed -E 's/.*"([0-9.]+)".*/\1/' || echo "")
+
+          # Find every workspace crate whose version moved. Output format:
+          #   " name@version name@version ..."
+          BUMPED=""
           echo "Diff range: $DIFF_RANGE"
           for f in $(git diff --name-only $DIFF_RANGE -- 'crates/*/Cargo.toml'); do
             [ -f "$f" ] || continue
@@ -208,8 +211,12 @@ jobs:
           fi
           # A tag pushed with GITHUB_TOKEN does NOT trigger other workflows
           # (GitHub's anti-recursion rule), so release.yml would never run.
-          # Dispatch it explicitly on the tag ref. This happens whether or
-          # not the tag already existed: a dropped dispatch was otherwise
-          # unrecoverable, because the tag was already there and every
-          # later run took the "skip" path.
+          # Dispatch it explicitly on the tag ref — but only when there is
+          # no release for that tag yet. Unconditionally dispatching made a
+          # dropped dispatch recoverable, and also rebuilt a release that
+          # already existed every time a later commit moved.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::$TAG already has a release; not re-dispatching."
+            exit 0
+          fi
           gh workflow run release.yml --ref "$TAG"
