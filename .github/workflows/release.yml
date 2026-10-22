@@ -51,10 +51,6 @@ jobs:
       - name: test
         run: cargo test --workspace --exclude vobes-desktop
 
-      - name: clippy desktop
-        working-directory: desktop
-        run: cargo clippy -p vobes-desktop --all-targets -- -D warnings
-
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.3
@@ -62,6 +58,17 @@ jobs:
       - name: install frontend deps
         working-directory: desktop
         run: bun install --frozen-lockfile
+
+      # Before clippy, not after: `tauri::generate_context!` refuses to
+      # compile when `frontendDist` (`../dist`) is missing, and the dist
+      # only exists once the frontend has been built.
+      - name: build frontend
+        working-directory: desktop
+        run: bun run build
+
+      - name: clippy desktop
+        working-directory: desktop
+        run: cargo clippy -p vobes-desktop --all-targets -- -D warnings
 
       - name: lint frontend
         working-directory: desktop
